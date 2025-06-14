@@ -1,0 +1,25 @@
+[project]
+name = "confidence-compass"
+version = "0.1.0"
+description = "AI-powered conversation practice platform"
+requires-python = ">=3.11"
+dependencies = [
+    "deepgram-sdk>=4.1.1",
+    "livekit-plugins-silero>=1.0.23",
+    "livekit>=1.0.8",
+    "livekit-agents>=1.0.23",
+    "openai>=1.84.0",
+    "python-dotenv>=1.1.0",
+    "livekit-plugins-azure>=1.0.23",
+    "livekit-plugins-openai>=1.0.23",
+    "livekit-plugins-deepgram>=1.0.23",
+    "httpx>=0.28.1",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "server"}
+packages = ["server"]
