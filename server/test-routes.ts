@@ -41,4 +41,18 @@ testRouter.get("/api/test/env", (req, res) => {
   });
 });
 
+// LiveKit status endpoint
+testRouter.get("/api/test/livekit-status", (req, res) => {
+  const isConfigured = liveKitService.isLiveKitConfigured();
+  const connectionUrl = liveKitService.getConnectionUrl();
+  
+  res.json({
+    configured: isConfigured,
+    connectionUrl,
+    message: isConfigured 
+      ? "LiveKit is configured and ready to use!" 
+      : "LiveKit is not configured. Please check your environment variables."
+  });
+});
+
 export default testRouter; 

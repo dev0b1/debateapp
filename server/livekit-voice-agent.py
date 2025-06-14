@@ -11,17 +11,42 @@ from livekit.plugins import deepgram, silero
 
 from openai import OpenAI
 
+# Load environment variables
 load_dotenv()
+
+# Debug: Print all environment variables (excluding sensitive values)
+print("\n=== Environment Variables Check ===")
+env_vars = {
+    "LIVEKIT_URL": os.getenv("LIVEKIT_URL"),
+    "LIVEKIT_API_KEY": os.getenv("LIVEKIT_API_KEY"),
+    "LIVEKIT_API_SECRET": os.getenv("LIVEKIT_API_SECRET"),
+    "DEEPGRAM_API_KEY": os.getenv("DEEPGRAM_API_KEY"),
+    "OPENROUTER_API_KEY": os.getenv("OPENROUTER_API_KEY")
+}
+
+for key, value in env_vars.items():
+    if value:
+        masked_value = value[:4] + "..." + value[-4:] if len(value) > 8 else "***"
+        print(f"{key}: {masked_value}")
+    else:
+        print(f"{key}: NOT SET")
+
+print("================================\n")
 
 # --- Custom LLM Wrapper for OpenRouter ---
 class OpenRouterLLM:
     def __init__(self, model: str = "deepseek/deepseek-chat-v3-0324:free", temperature: float = 0.7):
         api_key = os.getenv("OPENROUTER_API_KEY")
+        print(f"\n=== OpenRouter LLM Initialization ===")
+        print(f"API Key present: {'Yes' if api_key else 'No'}")
+        print(f"API Key length: {len(api_key) if api_key else 0}")
+        
         if not api_key or api_key == "your_openrouter_api_key_here":
             print("Warning: OpenRouter API key not configured. Using fallback mode.")
             self.client = None
             self.fallback_mode = True
         else:
+            print("OpenRouter API key configured. Initializing client...")
             self.client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
                 api_key=api_key,
@@ -30,6 +55,7 @@ class OpenRouterLLM:
         
         self.model = model
         self.temperature = temperature
+        print("================================\n")
 
     async def chat(self, chat_ctx, conn_options=None, fnc_ctx=None, tools=None, tool_choice=None):
         """Simple chat method that yields chunks directly"""
@@ -184,17 +210,20 @@ async def entrypoint(ctx: agents.JobContext):
         topic = "general conversation"
         difficulty = "intermediate"
     
-    print(f"Starting conversation practice agent for topic: {topic}, difficulty: {difficulty}")
+    print(f"\n=== Starting Conversation Practice Agent ===")
+    print(f"Topic: {topic}")
+    print(f"Difficulty: {difficulty}")
 
     # Check if Deepgram API key is available
     deepgram_api_key = os.getenv("DEEPGRAM_API_KEY")
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     
-    print(f"Environment check - Deepgram API key: {'SET' if deepgram_api_key else 'NOT SET'}")
-    print(f"Environment check - OpenRouter API key: {'SET' if openrouter_api_key else 'NOT SET'}")
+    print(f"\nAPI Keys Status:")
+    print(f"Deepgram API key: {'SET' if deepgram_api_key else 'NOT SET'}")
+    print(f"OpenRouter API key: {'SET' if openrouter_api_key else 'NOT SET'}")
     
     if not deepgram_api_key or deepgram_api_key == "your_deepgram_api_key_here":
-        print("Warning: Deepgram API key not configured. Voice features will be limited.")
+        print("\nWarning: Deepgram API key not configured. Voice features will be limited.")
         # Create a minimal session without STT/TTS
         session = AgentSession(
             llm=OpenRouterLLM(model="deepseek/deepseek-chat-v3-0324:free", temperature=0.7),
@@ -207,7 +236,7 @@ async def entrypoint(ctx: agents.JobContext):
         
         while retry_count < max_retries:
             try:
-                print(f"Attempting to create full session with STT/TTS (attempt {retry_count + 1}/{max_retries})")
+                print(f"\nAttempting to create full session with STT/TTS (attempt {retry_count + 1}/{max_retries})")
                 session = AgentSession(
                     stt=deepgram.STT(model="nova-2", language="en"),
                     llm=OpenRouterLLM(model="deepseek/deepseek-chat-v3-0324:free", temperature=0.7),
@@ -232,6 +261,7 @@ async def entrypoint(ctx: agents.JobContext):
     assistant = ConversationPracticeAssistant(topic, difficulty)
 
     try:
+        print("\nStarting session...")
         await session.start(
             room=ctx.room,
             agent=assistant,
@@ -239,9 +269,11 @@ async def entrypoint(ctx: agents.JobContext):
         )
 
         await ctx.connect()
+        print("Connected to LiveKit room")
 
         # Generate initial greeting using LiveKit's built-in method
         greeting = f"Hello! I'm here to help you practice {topic} conversations. How do you feel about this topic today?"
+        print(f"\nSending initial greeting: {greeting}")
         await session.generate_reply(instructions=greeting)
 
         # Keep session alive and handle conversation flow

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { VoiceMetric } from "@shared/schema";
 import { EnhancedVoiceAnalyzer, EnhancedVoiceMetrics } from "../lib/enhanced-voice-analyzer";
 import { PerformanceOptimizer } from "../lib/performance-optimizer";
+import { Track } from "livekit-client";
 
 /**
  * useVoiceAnalyzer Hook
@@ -31,7 +32,7 @@ import { PerformanceOptimizer } from "../lib/performance-optimizer";
 // Enhanced voice analyzer interface
 interface VoiceAnalyzerOptions {
   enableDeepgram?: boolean;
-  livekitAudioTrack?: any; // LiveKit audio track
+  livekitAudioTrack?: Track;
   deepgramApiKey?: string;
 }
 
@@ -83,18 +84,37 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
     if (!options.livekitAudioTrack || !audioContextRef.current) return;
 
     try {
-      // Connect to LiveKit audio track
-      const mediaStream = new MediaStream([options.livekitAudioTrack.mediaStreamTrack]);
-      const source = audioContextRef.current.createMediaStreamSource(mediaStream);
-      
-      if (analyserRef.current) {
-        source.connect(analyserRef.current);
+      // Get the MediaStreamTrack from LiveKit track
+      const mediaStreamTrack = options.livekitAudioTrack.mediaStreamTrack;
+      if (!mediaStreamTrack) {
+        console.error('No MediaStreamTrack available from LiveKit audio track');
+        return;
       }
 
-      // Initialize advanced analyzer with LiveKit stream
+      // Create a MediaStream from the track
+      const mediaStream = new MediaStream([mediaStreamTrack]);
+      streamRef.current = mediaStream;
+
+      // Create audio context and analyzer
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      if (!analyserRef.current) {
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 2048;
+      }
+
+      // Connect the audio track to the analyzer
+      const source = audioContextRef.current.createMediaStreamSource(mediaStream);
+      source.connect(analyserRef.current);
+
+      // Initialize enhanced analyzer with LiveKit stream
       if (enhancedAnalyzerRef.current) {
         await enhancedAnalyzerRef.current.initialize(mediaStream);
       }
+
+      // Start analysis
+      analyzeAudio();
     } catch (error) {
       console.error('Failed to connect to LiveKit audio:', error);
     }
@@ -264,40 +284,46 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-      
-      streamRef.current = stream;
-      
-      // Initialize audio context and analyzer
-      audioContextRef.current = new AudioContext();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 2048;
-      
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyserRef.current);
-      
-      // Initialize enhanced analyzer with microphone stream
-      if (enhancedAnalyzerRef.current) {
-        await enhancedAnalyzerRef.current.initialize(stream);
+      // If we have a LiveKit audio track, use that
+      if (options.livekitAudioTrack) {
+        await connectToLivekitAudio();
+      } else {
+        // Fallback to getting microphone access directly
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        });
+        
+        streamRef.current = stream;
+        
+        // Initialize audio context and analyzer
+        audioContextRef.current = new AudioContext();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 2048;
+        
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        source.connect(analyserRef.current);
+        
+        // Initialize enhanced analyzer with microphone stream
+        if (enhancedAnalyzerRef.current) {
+          await enhancedAnalyzerRef.current.initialize(stream);
+        }
       }
       
       // Initialize Deepgram connection
       initializeDeepgramConnection();
       
       setIsRecording(true);
-        analyzeAudio();
+      analyzeAudio();
 
     } catch (error) {
       console.error('Failed to start recording:', error);
       throw error;
     }
-  }, [initializeDeepgramConnection]);
+  }, [connectToLivekitAudio, initializeDeepgramConnection]);
 
   const stopRecording = useCallback(() => {
     if (streamRef.current) {
