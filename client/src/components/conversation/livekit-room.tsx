@@ -7,7 +7,7 @@ import {
   RoomContext,
   useRoomContext
 } from '@livekit/components-react';
-import { Room, Track } from 'livekit-client';
+import { Room, Track, RoomEvent, TrackEvent, ConnectionState } from 'livekit-client';
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
@@ -41,9 +41,15 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const [room] = useState(() => new Room({
     adaptiveStream: true,
     dynacast: true,
+    audioCaptureDefaults: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
   }));
   const [error, setError] = useState<string | null>(null);
   const [sessionTimer, setSessionTimer] = useState(0);
+  const [isConnected, setIsConnected] = useState(false);
   const timerRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -55,7 +61,62 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     const connect = async () => {
       try {
         if (mounted) {
+          console.log("Connecting to LiveKit room:", roomData);
           await room.connect(roomData.serverUrl, roomData.token);
+          console.log("Connected to LiveKit room successfully");
+          setIsConnected(true);
+          
+          // Subscribe to room events
+          room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+            console.log("Track subscribed:", track.kind, "from", participant.identity);
+            if (track.kind === Track.Kind.Audio) {
+              console.log("Audio track subscribed, checking quality...");
+              // Monitor audio track quality
+              track.on(TrackEvent.Muted, () => {
+                console.log("Audio track muted");
+                toast({
+                  title: "Audio Muted",
+                  description: "The audio track has been muted. Please check your microphone settings.",
+                  variant: "destructive"
+                });
+              });
+              track.on(TrackEvent.Unmuted, () => {
+                console.log("Audio track unmuted");
+              });
+            }
+          });
+
+          room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+            console.log("Track unsubscribed:", track.kind, "from", participant.identity);
+            if (track.kind === Track.Kind.Audio) {
+              console.log("Audio track unsubscribed");
+              toast({
+                title: "Audio Disconnected",
+                description: "The audio connection has been lost. Attempting to reconnect...",
+                variant: "destructive"
+              });
+            }
+          });
+
+          room.on(RoomEvent.ParticipantConnected, (participant) => {
+            console.log("Participant connected:", participant.identity);
+          });
+
+          room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+            console.log("Participant disconnected:", participant.identity);
+          });
+
+          room.on(RoomEvent.ConnectionStateChanged, (state) => {
+            console.log("Connection state changed:", state);
+            if (state === ConnectionState.Disconnected) {
+              toast({
+                title: "Connection Lost",
+                description: "Lost connection to the room. Attempting to reconnect...",
+                variant: "destructive"
+              });
+            }
+          });
+          
           toast({
             title: "Connected",
             description: "Successfully connected to conversation room.",
@@ -107,6 +168,16 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     );
   }
 
+  if (!isConnected) {
+    return (
+      <Card className="p-4">
+        <CardContent>
+          <p>Connecting to conversation room...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <RoomContext.Provider value={room}>
       <div className="h-full space-y-4">
@@ -123,7 +194,11 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           </div>
         </div>
         
-        <RoomAudioRenderer />
+        {/* Audio renderer must be inside RoomContext.Provider */}
+        <div className="relative">
+          <RoomAudioRenderer />
+        </div>
+        
         <ControlBar />
       </div>
     </RoomContext.Provider>
@@ -151,6 +226,10 @@ function MyVideoConference({ videoRef }: MyVideoConferenceProps) {
     ],
     { onlySubscribed: false },
   );
+
+  useEffect(() => {
+    console.log("Available tracks:", tracks);
+  }, [tracks]);
 
   return (
     <div className="relative">

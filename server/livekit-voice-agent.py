@@ -262,14 +262,29 @@ async def entrypoint(ctx: agents.JobContext):
 
     try:
         print("\nStarting session...")
+        # Configure room input options with audio settings
+        room_input_options = RoomInputOptions(
+            audio=True,  # Enable audio input
+            video=False,  # Disable video input
+            data=True,   # Enable data channel for messages
+        )
+        
         await session.start(
             room=ctx.room,
             agent=assistant,
-            room_input_options=RoomInputOptions(),
+            room_input_options=room_input_options,
         )
 
         await ctx.connect()
         print("Connected to LiveKit room")
+
+        # Subscribe to room events for audio monitoring
+        ctx.room.on("track_subscribed", lambda track, publication, participant: 
+            print(f"Track subscribed: {track.kind} from {participant.identity}")
+        )
+        ctx.room.on("track_unsubscribed", lambda track, publication, participant: 
+            print(f"Track unsubscribed: {track.kind} from {participant.identity}")
+        )
 
         # Generate initial greeting using LiveKit's built-in method
         greeting = f"Hello! I'm here to help you practice {topic} conversations. How do you feel about this topic today?"

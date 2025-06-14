@@ -132,21 +132,29 @@ router.post("/api/conversation/create-room", async (req, res) => {
     const { roomName, token } = await liveKitService.createConversationRoom(topicId);
     console.log("Room created:", roomName);
 
-    // Give user time to join before starting AI conversation
-    setTimeout(() => {
+    // Wait for agent to connect (with timeout)
+    const maxWaitTime = 10000; // 10 seconds
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitTime) {
       if (liveKitService.isAgentActive(roomName)) {
         console.log(`AI conversation started in room: ${roomName}`);
-      } else {
-        console.error(`Failed to start AI conversation in room: ${roomName}`);
-        liveKitService.stopVoiceAgent(roomName).catch(console.error);
+        return res.json({
+          roomName,
+          token,
+          serverUrl: liveKitService.getConnectionUrl(),
+          topic
+        });
       }
-    }, 200000);
+      await new Promise(resolve => setTimeout(resolve, 500)); // Check every 500ms
+    }
 
-    res.json({
-      roomName,
-      token,
-      serverUrl: liveKitService.getConnectionUrl(),
-      topic
+    // If we get here, the agent didn't connect in time
+    console.error(`Failed to start AI conversation in room: ${roomName}`);
+    await liveKitService.stopVoiceAgent(roomName);
+    return res.status(500).json({ 
+      error: "Failed to start AI conversation",
+      message: "The AI agent failed to connect. Please try again."
     });
 
   } catch (error) {
