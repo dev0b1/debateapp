@@ -141,7 +141,6 @@ export default function AIConversation() {
 
         <LiveKitRoom 
           roomData={roomData}
-          topic={selectedTopic!}
           onEnd={endConversation}
         />
       </div>

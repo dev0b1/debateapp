@@ -2,7 +2,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { VoiceMetric } from "@shared/schema";
 import { EnhancedVoiceAnalyzer, EnhancedVoiceMetrics } from "../lib/enhanced-voice-analyzer";
 import { PerformanceOptimizer } from "../lib/performance-optimizer";
-import { Track } from "livekit-client";
+import { Track, LocalTrack } from "livekit-client";
+import { useRoomContext } from "@livekit/components-react";
 
 /**
  * useVoiceAnalyzer Hook
@@ -32,11 +33,11 @@ import { Track } from "livekit-client";
 // Enhanced voice analyzer interface
 interface VoiceAnalyzerOptions {
   enableDeepgram?: boolean;
-  livekitAudioTrack?: Track;
   deepgramApiKey?: string;
 }
 
 export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
+  const room = useRoomContext();
   const [audioLevel, setAudioLevel] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceMetrics, setVoiceMetrics] = useState<VoiceMetric[]>([]);
@@ -73,19 +74,19 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
     };
   }, [options.enableDeepgram, options.deepgramApiKey]);
 
-  // Handle LiveKit audio track changes
-  useEffect(() => {
-    if (options.livekitAudioTrack && isRecording) {
-      connectToLivekitAudio();
-    }
-  }, [options.livekitAudioTrack, isRecording]);
-
   const connectToLivekitAudio = useCallback(async () => {
-    if (!options.livekitAudioTrack || !audioContextRef.current) return;
+    if (!room || !audioContextRef.current) return;
 
     try {
+      // Get the local audio track from the room
+      const audioTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
+      if (!audioTrack) {
+        console.error('No audio track available from LiveKit room');
+        return;
+      }
+
       // Get the MediaStreamTrack from LiveKit track
-      const mediaStreamTrack = options.livekitAudioTrack.mediaStreamTrack;
+      const mediaStreamTrack = audioTrack.mediaStreamTrack;
       if (!mediaStreamTrack) {
         console.error('No MediaStreamTrack available from LiveKit audio track');
         return;
@@ -106,7 +107,7 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
       // Connect the audio track to the analyzer
       const source = audioContextRef.current.createMediaStreamSource(mediaStream);
-      source.connect(analyserRef.current);
+        source.connect(analyserRef.current);
 
       // Initialize enhanced analyzer with LiveKit stream
       if (enhancedAnalyzerRef.current) {
@@ -118,7 +119,7 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
     } catch (error) {
       console.error('Failed to connect to LiveKit audio:', error);
     }
-  }, [options.livekitAudioTrack]);
+  }, [room]);
 
   const initializeDeepgramConnection = useCallback(() => {
     if (!options.enableDeepgram || !options.deepgramApiKey) return;
@@ -284,32 +285,32 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
   const startRecording = useCallback(async () => {
     try {
-      // If we have a LiveKit audio track, use that
-      if (options.livekitAudioTrack) {
+      // Try to use LiveKit audio track first
+      if (room) {
         await connectToLivekitAudio();
       } else {
         // Fallback to getting microphone access directly
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          } 
-        });
-        
-        streamRef.current = stream;
-        
-        // Initialize audio context and analyzer
-        audioContextRef.current = new AudioContext();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 2048;
-        
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        source.connect(analyserRef.current);
-        
-        // Initialize enhanced analyzer with microphone stream
-        if (enhancedAnalyzerRef.current) {
-          await enhancedAnalyzerRef.current.initialize(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      streamRef.current = stream;
+      
+      // Initialize audio context and analyzer
+      audioContextRef.current = new AudioContext();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 2048;
+      
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      
+      // Initialize enhanced analyzer with microphone stream
+      if (enhancedAnalyzerRef.current) {
+        await enhancedAnalyzerRef.current.initialize(stream);
         }
       }
       
@@ -317,13 +318,13 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
       initializeDeepgramConnection();
       
       setIsRecording(true);
-      analyzeAudio();
+        analyzeAudio();
 
     } catch (error) {
       console.error('Failed to start recording:', error);
       throw error;
     }
-  }, [connectToLivekitAudio, initializeDeepgramConnection]);
+  }, [connectToLivekitAudio, initializeDeepgramConnection, room]);
 
   const stopRecording = useCallback(() => {
     if (streamRef.current) {

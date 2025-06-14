@@ -1,6 +1,5 @@
-import {
-  LiveKitRoom as LiveKitRoomComponent,
-  RoomAudioRenderer,
+import { 
+  RoomAudioRenderer, 
   ControlBar,
   useTracks,
   GridLayout,
@@ -9,14 +8,13 @@ import {
   useRoomContext
 } from '@livekit/components-react';
 import { Room, Track } from 'livekit-client';
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
 import { ConversationTopic } from "@shared/schema";
 import { useToast } from "../../hooks/use-toast";
 import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
 import { useEyeTracking } from "../../hooks/use-eye-tracking";
-import { FaceTrackingDisplay } from "./face-tracking-display";
 import { MetricsPanel } from "../practice/metrics-panel";
 
 interface LiveKitRoomProps {
@@ -25,11 +23,21 @@ interface LiveKitRoomProps {
     token: string;
     serverUrl: string;
   };
-  topic: ConversationTopic;
   onEnd: () => void;
 }
 
-export function LiveKitRoom({ roomData, topic, onEnd }: LiveKitRoomProps) {
+/**
+ * LiveKitRoom Component
+ * 
+ * This component manages the real-time video/audio conversation with the AI agent.
+ * It handles:
+ * - LiveKit room connection and management
+ * - Video/audio track handling
+ * - Face tracking for eye contact analysis
+ * - Voice analysis for speech quality
+ * - Real-time metrics display
+ */
+export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const [room] = useState(() => new Room({
     adaptiveStream: true,
     dynacast: true,
@@ -38,17 +46,9 @@ export function LiveKitRoom({ roomData, topic, onEnd }: LiveKitRoomProps) {
   const [sessionTimer, setSessionTimer] = useState(0);
   const timerRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Get audio track from LiveKit
-  const tracks = useTracks(
-    [
-      { source: Track.Source.Microphone, withPlaceholder: true },
-    ],
-    { onlySubscribed: false },
-  );
-  const audioTrack = tracks.find(track => track.source === Track.Source.Microphone);
-
-  // Voice and eye tracking hooks
+  // Voice analysis for speech quality metrics
   const { 
     audioLevel, 
     voiceMetrics, 
@@ -56,23 +56,18 @@ export function LiveKitRoom({ roomData, topic, onEnd }: LiveKitRoomProps) {
     stopRecording
   } = useVoiceAnalyzer({
     enableDeepgram: true,
-    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY,
-    livekitAudioTrack: audioTrack
+    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY
   });
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Eye tracking for engagement analysis
   const { 
-    eyeTrackingData, 
     confidence,
-    currentMetrics,
-    isInitialized,
-    performanceStats
   } = useEyeTracking(videoRef, true, {
     enableVisualization: true,
     useSimpleDetector: false
   });
 
-  // Connect to room
+  // Connect to LiveKit room and initialize analysis
   useEffect(() => {
     let mounted = true;
     
@@ -84,26 +79,24 @@ export function LiveKitRoom({ roomData, topic, onEnd }: LiveKitRoomProps) {
             title: "Connected",
             description: "Successfully connected to conversation room.",
           });
-          
-          // Start voice analysis when audio track is available
-          if (audioTrack) {
-            startRecording();
-          }
-          
-          // Start session timer
-          timerRef.current = setInterval(() => {
-            setSessionTimer(prev => prev + 1);
-          }, 1000);
+      
+      // Start voice analysis
+      startRecording();
+      
+      // Start session timer
+      timerRef.current = setInterval(() => {
+        setSessionTimer(prev => prev + 1);
+      }, 1000);
         }
-      } catch (error) {
+    } catch (error) {
         console.error("Failed to connect to room:", error);
         setError("Failed to connect to conversation room");
-        toast({
+      toast({
           title: "Connection Error",
           description: "Failed to connect to conversation room. Please try again.",
-          variant: "destructive"
-        });
-      }
+        variant: "destructive"
+      });
+    }
     };
     connect();
 
@@ -115,9 +108,9 @@ export function LiveKitRoom({ roomData, topic, onEnd }: LiveKitRoomProps) {
       stopRecording();
       room.disconnect();
     };
-  }, [room, roomData.serverUrl, roomData.token, toast, startRecording, stopRecording, audioTrack]);
+  }, [room, roomData.serverUrl, roomData.token, toast, startRecording, stopRecording]);
 
-  // Format time
+  // Format time for display
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -175,7 +168,16 @@ interface MyVideoConferenceProps {
   videoRef: React.RefObject<HTMLVideoElement>;
 }
 
+/**
+ * MyVideoConference Component
+ * 
+ * Handles the video conference interface including:
+ * - Video/audio track display
+ * - Face tracking overlay
+ * - Participant tiles
+ */
 function MyVideoConference({ videoRef }: MyVideoConferenceProps) {
+  const room = useRoomContext();
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
