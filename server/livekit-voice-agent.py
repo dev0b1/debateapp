@@ -208,12 +208,12 @@ async def entrypoint(ctx: agents.JobContext):
         while retry_count < max_retries:
             try:
                 print(f"Attempting to create full session with STT/TTS (attempt {retry_count + 1}/{max_retries})")
-    session = AgentSession(
-        stt=deepgram.STT(model="nova-2", language="en"),
+                session = AgentSession(
+                    stt=deepgram.STT(model="nova-2", language="en"),
                     llm=OpenRouterLLM(model="deepseek/deepseek-chat-v3-0324:free", temperature=0.7),
-        tts=deepgram.TTS(model="aura-asteria-en"),
-        vad=silero.VAD.load(),
-    )
+                    tts=deepgram.TTS(model="aura-asteria-en"),
+                    vad=silero.VAD.load(),
+                )
                 print("Full session created successfully")
                 break
             except Exception as e:
@@ -232,32 +232,32 @@ async def entrypoint(ctx: agents.JobContext):
     assistant = ConversationPracticeAssistant(topic, difficulty)
 
     try:
-    await session.start(
-        room=ctx.room,
-        agent=assistant,
-        room_input_options=RoomInputOptions(),
-    )
+        await session.start(
+            room=ctx.room,
+            agent=assistant,
+            room_input_options=RoomInputOptions(),
+        )
 
-    await ctx.connect()
+        await ctx.connect()
 
         # Generate initial greeting using LiveKit's built-in method
         greeting = f"Hello! I'm here to help you practice {topic} conversations. How do you feel about this topic today?"
-    await session.generate_reply(instructions=greeting)
+        await session.generate_reply(instructions=greeting)
 
-    # Keep session alive and handle conversation flow
-    while ctx.room.connection_state == "connected":
-        await asyncio.sleep(1)
-        
-        # Provide periodic feedback during longer conversations
-            if assistant.conversation_history:
-            last_message_time = assistant.conversation_history[-1]["timestamp"]
-            current_time = asyncio.get_event_loop().time()
+        # Keep session alive and handle conversation flow
+        while ctx.room.connection_state == "connected":
+            await asyncio.sleep(1)
             
-            # If no activity for 30 seconds, prompt for continuation
-            if current_time - last_message_time > 30:
-                await session.generate_reply(
-                    instructions="The user seems to have paused. Gently encourage them to continue the conversation with a follow-up question."
-                )
+            # Provide periodic feedback during longer conversations
+            if assistant.conversation_history:
+                last_message_time = assistant.conversation_history[-1]["timestamp"]
+                current_time = asyncio.get_event_loop().time()
+                
+                # If no activity for 30 seconds, prompt for continuation
+                if current_time - last_message_time > 30:
+                    await session.generate_reply(
+                        instructions="The user seems to have paused. Gently encourage them to continue the conversation with a follow-up question."
+                    )
     except Exception as e:
         print(f"Error in voice agent session: {e}")
         # Try to provide a graceful fallback
