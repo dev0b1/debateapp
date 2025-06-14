@@ -263,11 +263,7 @@ async def entrypoint(ctx: agents.JobContext):
     try:
         print("\nStarting session...")
         # Configure room input options with audio settings
-        room_input_options = RoomInputOptions(
-            audio=True,  # Enable audio input
-            video=False,  # Disable video input
-            data=True,   # Enable data channel for messages
-        )
+        room_input_options = RoomInputOptions()
         
         await session.start(
             room=ctx.room,
