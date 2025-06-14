@@ -48,25 +48,6 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Voice analysis for speech quality metrics
-  const { 
-    audioLevel, 
-    voiceMetrics, 
-    startRecording,
-    stopRecording
-  } = useVoiceAnalyzer({
-    enableDeepgram: true,
-    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY
-  });
-
-  // Eye tracking for engagement analysis
-  const { 
-    confidence,
-  } = useEyeTracking(videoRef, true, {
-    enableVisualization: true,
-    useSimpleDetector: false
-  });
-
   // Connect to LiveKit room and initialize analysis
   useEffect(() => {
     let mounted = true;
@@ -79,24 +60,21 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             title: "Connected",
             description: "Successfully connected to conversation room.",
           });
-      
-      // Start voice analysis
-      startRecording();
-      
-      // Start session timer
-      timerRef.current = setInterval(() => {
-        setSessionTimer(prev => prev + 1);
-      }, 1000);
+          
+          // Start session timer
+          timerRef.current = setInterval(() => {
+            setSessionTimer(prev => prev + 1);
+          }, 1000);
         }
-    } catch (error) {
+      } catch (error) {
         console.error("Failed to connect to room:", error);
         setError("Failed to connect to conversation room");
-      toast({
+        toast({
           title: "Connection Error",
           description: "Failed to connect to conversation room. Please try again.",
-        variant: "destructive"
-      });
-    }
+          variant: "destructive"
+        });
+      }
     };
     connect();
 
@@ -105,10 +83,9 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      stopRecording();
       room.disconnect();
     };
-  }, [room, roomData.serverUrl, roomData.token, toast, startRecording, stopRecording]);
+  }, [room, roomData.serverUrl, roomData.token, toast]);
 
   // Format time for display
   const formatTime = (seconds: number): string => {
@@ -138,27 +115,16 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             <MyVideoConference videoRef={videoRef} />
           </div>
           <div className="lg:col-span-1">
-            <MetricsPanel
-              voiceMetrics={voiceMetrics}
-              eyeContactScore={confidence * 100}
+            <ConversationMetrics 
+              videoRef={videoRef}
               sessionTimer={formatTime(sessionTimer)}
-              overallScore={Math.round((confidence * 100 + audioLevel) / 2)}
-              isActive={true}
+              onEnd={onEnd}
             />
           </div>
         </div>
         
         <RoomAudioRenderer />
         <ControlBar />
-        
-        <div className="flex justify-end">
-          <Button
-            variant="destructive"
-            onClick={onEnd}
-          >
-            End Session
-          </Button>
-        </div>
       </div>
     </RoomContext.Provider>
   );
@@ -212,5 +178,60 @@ function MyVideoConference({ videoRef }: MyVideoConferenceProps) {
         />
       </div>
     </div>
+  );
+}
+
+interface ConversationMetricsProps {
+  videoRef: React.RefObject<HTMLVideoElement>;
+  sessionTimer: string;
+  onEnd: () => void;
+}
+
+function ConversationMetrics({ videoRef, sessionTimer, onEnd }: ConversationMetricsProps) {
+  // Voice analysis for speech quality metrics
+  const { 
+    audioLevel, 
+    voiceMetrics, 
+    startRecording,
+    stopRecording
+  } = useVoiceAnalyzer({
+    enableDeepgram: true,
+    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY
+  });
+
+  // Eye tracking for engagement analysis
+  const { 
+    confidence,
+  } = useEyeTracking(videoRef, true, {
+    enableVisualization: true,
+    useSimpleDetector: false
+  });
+
+  // Start voice analysis when component mounts
+  useEffect(() => {
+    startRecording();
+    return () => {
+      stopRecording();
+    };
+  }, [startRecording, stopRecording]);
+
+  return (
+    <>
+      <MetricsPanel
+        voiceMetrics={voiceMetrics}
+        eyeContactScore={confidence * 100}
+        sessionTimer={sessionTimer}
+        overallScore={Math.round((confidence * 100 + audioLevel) / 2)}
+        isActive={true}
+      />
+      <div className="flex justify-end mt-4">
+        <Button
+          variant="destructive"
+          onClick={onEnd}
+        >
+          End Session
+        </Button>
+      </div>
+    </>
   );
 }
