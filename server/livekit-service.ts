@@ -11,6 +11,7 @@ export class LiveKitService extends EventEmitter {
   private activeAgents: Map<string, any> = new Map();
   private agentHealthChecks: Map<string, NodeJS.Timeout> = new Map();
   private isConfigured: boolean = false;
+  private readonly TOKEN_EXPIRY = 24 * 60 * 60; // 24 hours in seconds
 
   constructor() {
     super();
@@ -43,7 +44,7 @@ export class LiveKitService extends EventEmitter {
     return this.isConfigured;
   }
 
-  async createConversationRoom(topicId: string): Promise<{ roomName: string; token: string }> {
+  async createConversationRoom(topicId: string): Promise<{ roomName: string; token: string; serverUrl: string; topic: ConversationTopic }> {
     if (!this.isConfigured) {
       throw new Error("LiveKit is not configured. Please set up your LiveKit credentials in the .env file.");
     }
@@ -55,41 +56,28 @@ export class LiveKitService extends EventEmitter {
       }
 
       const roomName = `practice-${Date.now()}`;
-      const token = new AccessToken(this.apiKey, this.apiSecret, {
+      
+      // Create user token
+      const userToken = new AccessToken(this.apiKey, this.apiSecret, {
         identity: "user",
         name: "Practice User",
+        ttl: this.TOKEN_EXPIRY
       });
 
-      token.addGrant({
+      userToken.addGrant({
         roomJoin: true,
         room: roomName,
         canPublish: true,
         canSubscribe: true,
         canPublishData: true,
+        canUpdateOwnMetadata: true
       });
 
-      // Start the voice agent with topic information
-      await this.startVoiceAgent(roomName, {
-        topic: topic.title,
-        difficulty: topic.difficulty,
-        prompt: topic.prompt
-      });
-
-      return {
-        roomName,
-        token: await token.toJwt(),
-      };
-    } catch (error) {
-      console.error("Error creating conversation room:", error);
-      throw error;
-    }
-  }
-
-  async createAIAgentToken(roomName: string): Promise<string> {
-    try {
+      // Create agent token
       const agentToken = new AccessToken(this.apiKey, this.apiSecret, {
         identity: "ai-agent",
         name: "AI Conversation Partner",
+        ttl: this.TOKEN_EXPIRY
       });
 
       agentToken.addGrant({
@@ -98,12 +86,26 @@ export class LiveKitService extends EventEmitter {
         canPublish: true,
         canSubscribe: true,
         canPublishData: true,
+        canUpdateOwnMetadata: true
       });
 
-      return agentToken.toJwt();
+      // Start the voice agent with topic information
+      await this.startVoiceAgent(roomName, {
+        topic: topic.title,
+        difficulty: topic.difficulty,
+        prompt: topic.prompt,
+        token: await agentToken.toJwt()
+      });
+
+      return {
+        roomName,
+        token: await userToken.toJwt(),
+        serverUrl: this.wsUrl,
+        topic
+      };
     } catch (error) {
-      console.error("Error creating AI agent token:", error);
-      throw new Error("Failed to create AI agent token");
+      console.error("Error creating conversation room:", error);
+      throw error;
     }
   }
 
@@ -137,36 +139,35 @@ export class LiveKitService extends EventEmitter {
   async startVoiceAgent(roomName: string, options: { 
     topic: string; 
     difficulty: string; 
-    prompt: string; 
+    prompt: string;
+    token: string;
   }): Promise<void> {
     try {
       // Create metadata for the voice agent
       const metadata = JSON.stringify({
         topic: options.topic,
         difficulty: options.difficulty,
-        prompt: options.prompt
+        prompt: options.prompt,
+        timestamp: Date.now()
       });
 
       // Find Python path
       const pythonPath = await this.findPythonPath();
 
-      // Start the Python voice agent process with connect command
+      // Start the Python voice agent process
       const agentProcess = spawn(pythonPath, [
-        'server/livekit-voice-agent.py',
-        'connect',
-        '--room',
-        roomName
+        'server/livekit-voice-agent.py'
       ], {
         env: {
           ...process.env,
           LIVEKIT_URL: this.wsUrl,
-          LIVEKIT_API_KEY: this.apiKey,
-          LIVEKIT_API_SECRET: this.apiSecret,
+          LIVEKIT_TOKEN: options.token,
+          LIVEKIT_ROOM_NAME: roomName,
           OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
           DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
           ROOM_METADATA: metadata
         },
-        cwd: process.cwd() // Ensure we're in the right directory
+        cwd: process.cwd()
       });
 
       // Store the agent process
@@ -198,29 +199,21 @@ export class LiveKitService extends EventEmitter {
       // Start health check
       this.startHealthCheck(roomName);
 
-      // Wait a moment for the agent to initialize
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
     } catch (error) {
-      console.error('Failed to start voice agent:', error);
-      this.emit('agentError', { roomName, error });
-      throw new Error('Failed to start voice agent');
+      console.error("Error starting voice agent:", error);
+      throw error;
     }
   }
 
   private startHealthCheck(roomName: string): void {
-    // Clear any existing health check
-    this.stopHealthCheck(roomName);
-
-    // Start new health check
     const healthCheck = setInterval(() => {
-      const agentProcess = this.activeAgents.get(roomName);
-      if (!agentProcess || agentProcess.killed) {
-        console.log(`Voice Agent ${roomName} health check failed - agent not running`);
-        this.emit('agentError', { roomName, error: new Error('Agent process not running') });
+      const agent = this.activeAgents.get(roomName);
+      if (!agent || agent.killed) {
+        console.error(`Voice Agent ${roomName} is not responding`);
+        this.emit('agentError', { roomName, error: 'Agent not responding' });
         this.cleanupAgent(roomName);
       }
-    }, 5000); // Check every 5 seconds
+    }, 30000); // Check every 30 seconds
 
     this.agentHealthChecks.set(roomName, healthCheck);
   }
@@ -234,13 +227,9 @@ export class LiveKitService extends EventEmitter {
   }
 
   private cleanupAgent(roomName: string): void {
-    const agentProcess = this.activeAgents.get(roomName);
-    if (agentProcess) {
-      try {
-        agentProcess.kill();
-      } catch (error) {
-        console.error(`Error killing agent process for room ${roomName}:`, error);
-      }
+    const agent = this.activeAgents.get(roomName);
+    if (agent) {
+      agent.kill();
       this.activeAgents.delete(roomName);
     }
     this.stopHealthCheck(roomName);
@@ -248,27 +237,29 @@ export class LiveKitService extends EventEmitter {
 
   async stopVoiceAgent(roomName: string): Promise<void> {
     try {
-      const agentProcess = this.activeAgents.get(roomName);
-      if (agentProcess) {
-        agentProcess.kill();
-        this.cleanupAgent(roomName);
-        console.log(`Voice Agent ${roomName} stopped successfully`);
+      const agent = this.activeAgents.get(roomName);
+      if (agent) {
+        agent.kill();
+        this.activeAgents.delete(roomName);
+        this.stopHealthCheck(roomName);
       }
     } catch (error) {
-      console.error(`Error stopping voice agent for room ${roomName}:`, error);
+      console.error("Error stopping voice agent:", error);
       throw error;
     }
   }
 
-  // Cleanup all active agents
   async cleanup(): Promise<void> {
+    // Stop all active agents
     const roomNames = Array.from(this.activeAgents.keys());
-    await Promise.all(roomNames.map(roomName => this.stopVoiceAgent(roomName)));
+    for (const roomName of roomNames) {
+      await this.stopVoiceAgent(roomName);
+    }
   }
 
   isAgentActive(roomName: string): boolean {
-    const agentProcess = this.activeAgents.get(roomName);
-    return !!agentProcess && !agentProcess.killed;
+    const agent = this.activeAgents.get(roomName);
+    return !!agent && !agent.killed;
   }
 }
 

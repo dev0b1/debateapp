@@ -2,20 +2,21 @@ import {
   RoomAudioRenderer, 
   ControlBar,
   useTracks,
-  GridLayout,
-  ParticipantTile,
   RoomContext,
   useRoomContext
 } from '@livekit/components-react';
-import { Room, Track, RoomEvent, TrackEvent, ConnectionState } from 'livekit-client';
+import { Room, Track, RoomEvent, TrackEvent, ConnectionState, LocalAudioTrack } from 'livekit-client';
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
-import { ConversationTopic } from "@shared/schema";
 import { useToast } from "../../hooks/use-toast";
 import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
 import { useEyeTracking } from "../../hooks/use-eye-tracking";
 import { MetricsPanel } from "../practice/metrics-panel";
+import { FaceTrackingDisplay } from "../conversation/face-tracking-display";
+import { useCamera } from "../../hooks/use-camera";
+import { EyeContactMetrics } from "@/lib/mediapipe-utils";
+import { FaceTrackingData } from "@/lib/face-tracking-types";
 
 interface LiveKitRoomProps {
   roomData: {
@@ -26,17 +27,40 @@ interface LiveKitRoomProps {
   onEnd: () => void;
 }
 
-/**
- * LiveKitRoom Component
- * 
- * This component manages the real-time video/audio conversation with the AI agent.
- * It handles:
- * - LiveKit room connection and management
- * - Video/audio track handling
- * - Face tracking for eye contact analysis
- * - Voice analysis for speech quality
- * - Real-time metrics display
- */
+function transformToFaceTrackingData(metrics: EyeContactMetrics | null): FaceTrackingData | null {
+  if (!metrics) return null;
+
+  const calculateHeadPose = () => {
+    const { x, y, z } = metrics.gazeDirection;
+    const yaw = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
+    const pitch = Math.atan2(-y, Math.sqrt(x * x + z * z)) * (180 / Math.PI);
+    const roll = Math.atan2(z, Math.sqrt(x * x + y * y)) * (180 / Math.PI);
+
+    return {
+      pitch: Math.max(-45, Math.min(45, pitch)),
+      yaw: Math.max(-45, Math.min(45, yaw)),
+      roll: Math.max(-30, Math.min(30, roll))
+    };
+  };
+
+  return {
+    eyeContact: {
+      x: metrics.gazeDirection.x,
+      y: metrics.gazeDirection.y,
+      confidence: metrics.confidence,
+      timestamp: Date.now()
+    },
+    headPose: calculateHeadPose(),
+    eyeOpenness: {
+      left: metrics.eyeAspectRatio.left,
+      right: metrics.eyeAspectRatio.right
+    },
+    blinkRate: metrics.blinkRate,
+    faceLandmarks: [],
+    faceDetected: metrics.confidence > 0.5
+  };
+}
+
 export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const [room] = useState(() => new Room({
     adaptiveStream: true,
@@ -46,32 +70,80 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       noiseSuppression: true,
       autoGainControl: true,
     },
+    stopLocalTrackOnUnpublish: true
   }));
   const [error, setError] = useState<string | null>(null);
   const [sessionTimer, setSessionTimer] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
   const timerRef = useRef<NodeJS.Timeout>();
+  const audioTrackRef = useRef<LocalAudioTrack | null>(null);
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Connect to LiveKit room and initialize analysis
+  const { stream: cameraStream } = useCamera();
+  const { 
+    eyeTrackingData,
+    confidence,
+    currentMetrics,
+    performanceStats,
+    isInitialized: isEyeTrackingInitialized
+  } = useEyeTracking(videoRef, isConnected, {
+    enableVisualization: true,
+    performanceMode: true
+  });
+
   useEffect(() => {
     let mounted = true;
-    
+
     const connect = async () => {
       try {
         if (mounted) {
           console.log("Connecting to LiveKit room:", roomData);
           await room.connect(roomData.serverUrl, roomData.token);
           console.log("Connected to LiveKit room successfully");
+
+          try {
+            const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioTrack = new LocalAudioTrack(micStream.getAudioTracks()[0]);
+            await room.localParticipant.publishTrack(audioTrack);
+            audioTrackRef.current = audioTrack;
+            console.log("Published local audio track");
+
+            const audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(micStream);
+            const analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            analyser.fftSize = 512;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            const updateAudioLevel = () => {
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const average = sum / dataArray.length;
+              setAudioLevel(Math.round(average));
+              requestAnimationFrame(updateAudioLevel);
+            };
+            updateAudioLevel();
+          } catch (micErr) {
+            console.error("Mic permission denied or capture failed:", micErr);
+            toast({
+              title: "Microphone Access Denied",
+              description: "Please allow microphone access to begin the session.",
+              variant: "destructive"
+            });
+          }
+
           setIsConnected(true);
-          
-          // Subscribe to room events
+
           room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
             console.log("Track subscribed:", track.kind, "from", participant.identity);
             if (track.kind === Track.Kind.Audio) {
-              console.log("Audio track subscribed, checking quality...");
-              // Monitor audio track quality
+              console.log("Audio track subscribed");
               track.on(TrackEvent.Muted, () => {
                 console.log("Audio track muted");
                 toast({
@@ -98,31 +170,32 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             }
           });
 
-          room.on(RoomEvent.ParticipantConnected, (participant) => {
-            console.log("Participant connected:", participant.identity);
-          });
-
-          room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-            console.log("Participant disconnected:", participant.identity);
-          });
-
           room.on(RoomEvent.ConnectionStateChanged, (state) => {
             console.log("Connection state changed:", state);
-            if (state === ConnectionState.Disconnected) {
-              toast({
-                title: "Connection Lost",
-                description: "Lost connection to the room. Attempting to reconnect...",
-                variant: "destructive"
-              });
+            switch (state) {
+              case ConnectionState.Connecting:
+                toast({ title: "Connecting", description: "Establishing connection to the room..." });
+                break;
+              case ConnectionState.Connected:
+                toast({ title: "Connected", description: "Successfully connected to conversation room." });
+                break;
+              case ConnectionState.Disconnected:
+                toast({
+                  title: "Disconnected",
+                  description: "Lost connection to the room. Attempting to reconnect...",
+                  variant: "destructive"
+                });
+                break;
+              case ConnectionState.Reconnecting:
+                toast({
+                  title: "Reconnecting",
+                  description: "Attempting to reconnect to the room...",
+                  variant: "destructive"
+                });
+                break;
             }
           });
-          
-          toast({
-            title: "Connected",
-            description: "Successfully connected to conversation room.",
-          });
-          
-          // Start session timer
+
           timerRef.current = setInterval(() => {
             setSessionTimer(prev => prev + 1);
           }, 1000);
@@ -148,7 +221,18 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     };
   }, [room, roomData.serverUrl, roomData.token, toast]);
 
-  // Format time for display
+  const toggleMic = () => {
+    const track = audioTrackRef.current;
+    if (track) {
+      if (isMicMuted) {
+        track.unmute();
+      } else {
+        track.mute();
+      }
+      setIsMicMuted(!isMicMuted);
+    }
+  };
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -181,95 +265,63 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   return (
     <RoomContext.Provider value={room}>
       <div className="h-full space-y-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <MyVideoConference videoRef={videoRef} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            <canvas
+              id="face-tracking-canvas"
+              className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+            />
+            {isEyeTrackingInitialized && (
+              <FaceTrackingDisplay
+                faceTrackingData={transformToFaceTrackingData(currentMetrics)}
+                confidence={confidence}
+                isActive={isConnected}
+                videoRef={videoRef}
+                performanceStats={performanceStats}
+              />
+            )}
           </div>
-          <div className="lg:col-span-1">
+
+          <div>
             <ConversationMetrics 
-              videoRef={videoRef}
               sessionTimer={formatTime(sessionTimer)}
               onEnd={onEnd}
+              eyeContactScore={currentMetrics?.attentionScore || 0}
+              audioLevel={audioLevel}
+              isMicMuted={isMicMuted}
+              toggleMic={toggleMic}
             />
           </div>
         </div>
-        
-        {/* Audio renderer must be inside RoomContext.Provider */}
+
         <div className="relative">
           <RoomAudioRenderer />
         </div>
-        
+
         <ControlBar />
       </div>
     </RoomContext.Provider>
   );
 }
 
-interface MyVideoConferenceProps {
-  videoRef: React.RefObject<HTMLVideoElement>;
-}
-
-/**
- * MyVideoConference Component
- * 
- * Handles the video conference interface including:
- * - Video/audio track display
- * - Face tracking overlay
- * - Participant tiles
- */
-function MyVideoConference({ videoRef }: MyVideoConferenceProps) {
-  const room = useRoomContext();
-  const tracks = useTracks(
-    [
-      { source: Track.Source.Camera, withPlaceholder: true },
-      { source: Track.Source.Microphone, withPlaceholder: true },
-    ],
-    { onlySubscribed: false },
-  );
-
-  useEffect(() => {
-    console.log("Available tracks:", tracks);
-  }, [tracks]);
-
-  return (
-    <div className="relative">
-      <GridLayout 
-        tracks={tracks} 
-        className="h-[calc(100vh-var(--lk-control-bar-height)-8rem)]"
-      >
-        <ParticipantTile />
-      </GridLayout>
-      
-      {/* Face tracking overlay */}
-      <div className="absolute inset-0 pointer-events-none">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="w-full h-full object-cover opacity-0"
-        />
-        <canvas
-          id="face-tracking-canvas"
-          className="absolute inset-0 w-full h-full"
-          width={640}
-          height={480}
-        />
-      </div>
-    </div>
-  );
-}
-
 interface ConversationMetricsProps {
-  videoRef: React.RefObject<HTMLVideoElement>;
   sessionTimer: string;
   onEnd: () => void;
+  eyeContactScore: number;
+  audioLevel: number;
+  isMicMuted: boolean;
+  toggleMic: () => void;
 }
 
-function ConversationMetrics({ videoRef, sessionTimer, onEnd }: ConversationMetricsProps) {
-  // Voice analysis for speech quality metrics
+function ConversationMetrics({ sessionTimer, onEnd, eyeContactScore, audioLevel, isMicMuted, toggleMic }: ConversationMetricsProps) {
   const { 
-    audioLevel, 
     voiceMetrics, 
     startRecording,
     stopRecording
@@ -278,15 +330,6 @@ function ConversationMetrics({ videoRef, sessionTimer, onEnd }: ConversationMetr
     deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY
   });
 
-  // Eye tracking for engagement analysis
-  const { 
-    confidence,
-  } = useEyeTracking(videoRef, true, {
-    enableVisualization: true,
-    useSimpleDetector: false
-  });
-
-  // Start voice analysis when component mounts
   useEffect(() => {
     startRecording();
     return () => {
@@ -298,16 +341,16 @@ function ConversationMetrics({ videoRef, sessionTimer, onEnd }: ConversationMetr
     <>
       <MetricsPanel
         voiceMetrics={voiceMetrics}
-        eyeContactScore={confidence * 100}
+        eyeContactScore={eyeContactScore}
         sessionTimer={sessionTimer}
-        overallScore={Math.round((confidence * 100 + audioLevel) / 2)}
+        overallScore={Math.round(audioLevel)}
         isActive={true}
       />
-      <div className="flex justify-end mt-4">
-        <Button
-          variant="destructive"
-          onClick={onEnd}
-        >
+      <div className="flex justify-between mt-4">
+        <Button onClick={toggleMic} variant="secondary">
+          {isMicMuted ? "Unmute Mic" : "Mute Mic"}
+        </Button>
+        <Button variant="destructive" onClick={onEnd}>
           End Session
         </Button>
       </div>
