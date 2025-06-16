@@ -13,6 +13,22 @@ from livekit.plugins import (
     deepgram,
     silero,
 )
+# Correct noise cancellation import for LiveKit Agent >= 1.0
+try:
+    from livekit.plugins.noise_cancellation import NoiseCancellation
+except ImportError:
+    try:
+        # Alternative import paths for different versions
+        from livekit.plugins import noise_cancellation
+        NoiseCancellation = noise_cancellation.NoiseCancellation
+    except ImportError:
+        try:
+            from livekit.plugins.noise_cancellation import BVC
+            NoiseCancellation = BVC
+        except ImportError:
+            NoiseCancellation = None
+            logging.warning("Noise cancellation plugin not available")
+
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 # Configure logging
@@ -117,6 +133,7 @@ async def entrypoint(ctx: agents.JobContext):
         topic = metadata.get("topic", "general conversation")
         difficulty = metadata.get("difficulty", "intermediate")
 
+        # Updated session configuration for LiveKit Agent >= 1.0
         session = AgentSession(
             stt=deepgram.STT(model="nova-3", language="multi"),
             llm=openai.LLM(model="gpt-4-turbo-preview"),
@@ -127,10 +144,19 @@ async def entrypoint(ctx: agents.JobContext):
 
         assistant = ConversationAssistant(topic=topic, difficulty=difficulty)
 
+        # Correct room input options for LiveKit Agent >= 1.0
+        room_input_options = RoomInputOptions()
+        if NoiseCancellation is not None:
+            # Use the correct noise cancellation class
+            room_input_options.noise_cancellation = NoiseCancellation()
+            logger.info("Noise cancellation enabled")
+        else:
+            logger.warning("Noise cancellation plugin not available, running without noise cancellation")
+
         await session.start(
             room=ctx.room,
             agent=assistant,
-            room_input_options=RoomInputOptions(),
+            room_input_options=room_input_options,
         )
 
         await ctx.connect()
@@ -140,6 +166,7 @@ async def entrypoint(ctx: agents.JobContext):
             f"Hello! I'm your {topic} conversation practice assistant. You can start talking whenever you're ready, and I'll help you improve your speaking skills."
         )
 
+        # Keep the agent running
         while True:
             await asyncio.sleep(1)
 
