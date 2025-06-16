@@ -14,20 +14,7 @@ from livekit.plugins import (
     silero,
 )
 # Correct noise cancellation import for LiveKit Agent >= 1.0
-try:
-    from livekit.plugins.noise_cancellation import NoiseCancellation
-except ImportError:
-    try:
-        # Alternative import paths for different versions
-        from livekit.plugins import noise_cancellation
-        NoiseCancellation = noise_cancellation.NoiseCancellation
-    except ImportError:
-        try:
-            from livekit.plugins.noise_cancellation import BVC
-            NoiseCancellation = BVC
-        except ImportError:
-            NoiseCancellation = None
-            logging.warning("Noise cancellation plugin not available")
+
 
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
@@ -146,12 +133,6 @@ async def entrypoint(ctx: agents.JobContext):
 
         # Correct room input options for LiveKit Agent >= 1.0
         room_input_options = RoomInputOptions()
-        if NoiseCancellation is not None:
-            # Use the correct noise cancellation class
-            room_input_options.noise_cancellation = NoiseCancellation()
-            logger.info("Noise cancellation enabled")
-        else:
-            logger.warning("Noise cancellation plugin not available, running without noise cancellation")
 
         await session.start(
             room=ctx.room,
