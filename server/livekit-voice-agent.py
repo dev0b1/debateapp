@@ -11,7 +11,6 @@ from livekit.agents import AgentSession, Agent, RoomInputOptions
 from livekit.plugins import (
     openai,
     deepgram,
-    noise_cancellation,
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -131,9 +130,7 @@ async def entrypoint(ctx: agents.JobContext):
         await session.start(
             room=ctx.room,
             agent=assistant,
-            room_input_options=RoomInputOptions(
-                noise_cancellation=noise_cancellation.BVC(),
-            ),
+            room_input_options=RoomInputOptions(),
         )
 
         await ctx.connect()
