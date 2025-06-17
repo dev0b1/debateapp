@@ -156,7 +156,8 @@ export class LiveKitService extends EventEmitter {
 
       // Start the Python voice agent process
       const agentProcess = spawn(pythonPath, [
-        'server/livekit-voice-agent.py'
+        'server/livekit-voice-agent.py',
+        'dev'
       ], {
         env: {
           ...process.env,
