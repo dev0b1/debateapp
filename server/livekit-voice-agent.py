@@ -5,18 +5,12 @@ import asyncio
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
-from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
-from livekit.plugins import (
-    openai,
-    deepgram,
-    silero,
-)
-# Correct noise cancellation import for LiveKit Agent >= 1.0
-
-
+from livekit.plugins import deepgram, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
+from openai import OpenAI
 
 # Configure logging
 logging.basicConfig(
@@ -25,8 +19,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# --- ✅ Custom OpenRouter LLM Wrapper ---
+class OpenRouterLLM:
+    def __init__(self):
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key="sk-your_openrouter_key",  # Replace with your actual OpenRouter API key
+        )
+        self.model = "deepseek/deepseek-chat-v3-0324:free"
+        self.headers = {
+            "HTTP-Referer": "https://your-site.com",  # Optional, for OpenRouter analytics
+            "X-Title": "ConversationAssistant"
+        }
+
+    async def chat(self, messages):
+        try:
+            completion = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                extra_headers=self.headers
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            logger.error(f"OpenRouterLLM error: {str(e)}")
+            return "Sorry, I encountered an error trying to respond."
+
+
+# --- ✅ AI Assistant ---
 class ConversationAssistant(Agent):
-    def __init__(self, topic: str = "general conversation", difficulty: str = "intermediate") -> None:
+    def __init__(self, llm, topic: str = "general conversation", difficulty: str = "intermediate") -> None:
         self.topic = topic
         self.difficulty = difficulty
         self.conversation_history = []
@@ -38,6 +60,7 @@ class ConversationAssistant(Agent):
             "speech_rate": 0,
             "clarity_score": 0
         }
+        self.llm = llm
 
         system_prompt = f"""You are an AI conversation practice assistant specializing in {topic} at {difficulty} level.
         Your role is to:
@@ -56,11 +79,11 @@ class ConversationAssistant(Agent):
             self.conversation_history.append({"role": "user", "content": message})
             response = await self.generate_response(message)
             self.conversation_history.append({"role": "assistant", "content": response})
-            await self.say(response)  # 🔈 Ensure AI speaks the response
+            await self.say(response)
             self._update_metrics(message)
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
-            await self.say("I apologize, but I encountered an error. Please try again.")
+            await self.say("I encountered an error. Please try again.")
 
     def _update_metrics(self, message: str) -> None:
         self.session_metrics["total_speech_time"] += len(message.split()) * 0.3
@@ -73,16 +96,11 @@ class ConversationAssistant(Agent):
         self.session_metrics["speech_rate"] = words / time_elapsed if time_elapsed > 0 else 0
 
     async def generate_response(self, user_prompt: str) -> str:
-        try:
-            messages = [
-                {"role": "system", "content": "You are a helpful conversation practice assistant. Provide natural, engaging responses that encourage the user to practice their speaking skills."},
-                *self.conversation_history
-            ]
-            response = await self.llm.chat(messages)
-            return response
-        except Exception as e:
-            logger.error(f"Error generating response: {str(e)}")
-            return "I apologize, but I encountered an error. Please try again."
+        messages = [
+            {"role": "system", "content": "You are a helpful conversation practice assistant. Provide natural, engaging responses that encourage the user to practice their speaking skills."},
+            *self.conversation_history
+        ]
+        return await self.llm.chat(messages)
 
     async def generate_session_feedback(self) -> Dict[str, Any]:
         try:
@@ -114,24 +132,26 @@ class ConversationAssistant(Agent):
                 "metrics": self.session_metrics
             }
 
+
+# --- ✅ LiveKit Agent Entrypoint ---
 async def entrypoint(ctx: agents.JobContext):
     try:
         metadata = json.loads(os.getenv("ROOM_METADATA", "{}"))
         topic = metadata.get("topic", "general conversation")
         difficulty = metadata.get("difficulty", "intermediate")
 
-        # Updated session configuration for LiveKit Agent >= 1.0
+        llm = OpenRouterLLM()
+
         session = AgentSession(
             stt=deepgram.STT(model="nova-3", language="multi"),
-            llm=openai.LLM(model="gpt-4-turbo-preview"),
+            llm=llm,
             tts=deepgram.TTS(model="aura-asteria-en", voice="nova"),
             vad=silero.VAD.load(),
             turn_detection=MultilingualModel(),
         )
 
-        assistant = ConversationAssistant(topic=topic, difficulty=difficulty)
+        assistant = ConversationAssistant(llm=llm, topic=topic, difficulty=difficulty)
 
-        # Correct room input options for LiveKit Agent >= 1.0
         room_input_options = RoomInputOptions()
 
         await session.start(
@@ -142,12 +162,10 @@ async def entrypoint(ctx: agents.JobContext):
 
         await ctx.connect()
 
-        # 🔊 Speak a default welcome message even if the user says nothing
         await assistant.say(
-            f"Hello! I'm your {topic} conversation practice assistant. You can start talking whenever you're ready, and I'll help you improve your speaking skills."
+            f"Hello! I'm your {topic} conversation practice assistant. You can start talking whenever you're ready."
         )
 
-        # Keep the agent running
         while True:
             await asyncio.sleep(1)
 
@@ -155,6 +173,6 @@ async def entrypoint(ctx: agents.JobContext):
         logger.error(f"Fatal error in agent session: {str(e)}")
         raise
 
+
 if __name__ == "__main__":
-    load_dotenv()
     agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
