@@ -143,9 +143,9 @@ async def entrypoint(ctx: agents.JobContext):
         llm = OpenRouterLLM()
 
         session = AgentSession(
-            stt=deepgram.STT(model="nova-3", language="multi"),
+            stt=deepgram.STT(model="nova-3"),
             llm=llm,
-            tts=deepgram.TTS(model="aura-asteria-en", voice="nova"),
+            tts=deepgram.TTS(model="aura-asteria-en"),
             vad=silero.VAD.load(),
             turn_detection=MultilingualModel(),
         )
