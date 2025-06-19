@@ -152,7 +152,7 @@ async def entrypoint(ctx: agents.JobContext):
         session = AgentSession(
             stt=deepgram.STT(model="nova-3"),
             tts=deepgram.TTS(model="aura-asteria-en"),
-            # vad=silero.VAD.load(),
+            vad=silero.VAD.load(),
             # turn_detection=MultilingualModel(),
         )
 
