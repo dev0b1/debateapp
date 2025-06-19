@@ -60,7 +60,7 @@ class ConversationAssistant(Agent):
             "speech_rate": 0,
             "clarity_score": 0
         }
-        self.llm = llm
+        self._llm = llm
 
         system_prompt = f"""You are an AI conversation practice assistant specializing in {topic} at {difficulty} level.
         Your role is to:
@@ -100,7 +100,7 @@ class ConversationAssistant(Agent):
             {"role": "system", "content": "You are a helpful conversation practice assistant. Provide natural, engaging responses that encourage the user to practice their speaking skills."},
             *self.conversation_history
         ]
-        return await self.llm.chat(messages)
+        return await self._llm.chat(messages)
 
     async def generate_session_feedback(self) -> Dict[str, Any]:
         try:
@@ -119,7 +119,7 @@ class ConversationAssistant(Agent):
             2. Specific areas for improvement
             3. Suggested exercises
             """
-            feedback = await self.llm.chat([{"role": "user", "content": feedback_prompt}])
+            feedback = await self._llm.chat([{"role": "user", "content": feedback_prompt}])
             return {
                 "session_duration": session_duration,
                 "metrics": self.session_metrics,
