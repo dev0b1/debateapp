@@ -3,12 +3,12 @@ import sys
 import json
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from datetime import datetime
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
 from livekit.plugins import deepgram, silero
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
+# from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from openai import OpenAI
 
@@ -27,9 +27,9 @@ class OpenRouterLLM:
             base_url="https://openrouter.ai/api/v1",
             api_key="sk-your_openrouter_key",  # Replace with your actual OpenRouter API key
         )
-        self.model = "deepseek/deepseek-chat-v3-0324:free"
+        self.model = "mistralai/mistral-7b-instruct:free"
         self.headers = {
-            "HTTP-Referer": "https://your-site.com",  # Optional, for OpenRouter analytics
+            "HTTP-Referer": "https://your-site.com",  # Optional
             "X-Title": "ConversationAssistant"
         }
 
@@ -50,14 +50,14 @@ class OpenRouterLLM:
 class ConversationAssistant(Agent):
     def __init__(
         self,
-        llm,
+        llm: OpenRouterLLM,
         session: AgentSession,
         topic: str = "general conversation",
         difficulty: str = "intermediate"
     ) -> None:
         self.topic = topic
         self.difficulty = difficulty
-        self.session = session
+        self._session = session  # ✅ renamed to avoid collision
         self._llm = llm
         self.conversation_history = []
         self.session_start_time = datetime.now()
@@ -86,11 +86,11 @@ class ConversationAssistant(Agent):
             self.conversation_history.append({"role": "user", "content": message})
             response = await self.generate_response(message)
             self.conversation_history.append({"role": "assistant", "content": response})
-            await self.session.say(response)
+            await self._session.say(response)
             self._update_metrics(message)
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
-            await self.session.say("I encountered an error. Please try again.")
+            await self._session.say("I encountered an error. Please try again.")
 
     def _update_metrics(self, message: str) -> None:
         self.session_metrics["total_speech_time"] += len(message.split()) * 0.3
@@ -151,9 +151,8 @@ async def entrypoint(ctx: agents.JobContext):
 
         session = AgentSession(
             stt=deepgram.STT(model="nova-3"),
-            llm=llm,
             tts=deepgram.TTS(model="aura-asteria-en"),
-            #vad=silero.VAD.load(),
+            # vad=silero.VAD.load(),
             # turn_detection=MultilingualModel(),
         )
 
@@ -182,4 +181,6 @@ async def entrypoint(ctx: agents.JobContext):
 
 
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
+    agents.cli.run_app(
+        agents.WorkerOptions(entrypoint_fnc=entrypoint, timeout=60)
+    )
