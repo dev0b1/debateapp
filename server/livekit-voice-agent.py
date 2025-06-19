@@ -48,9 +48,17 @@ class OpenRouterLLM:
 
 # --- ✅ AI Assistant ---
 class ConversationAssistant(Agent):
-    def __init__(self, llm, topic: str = "general conversation", difficulty: str = "intermediate") -> None:
+    def __init__(
+        self,
+        llm,
+        session: AgentSession,
+        topic: str = "general conversation",
+        difficulty: str = "intermediate"
+    ) -> None:
         self.topic = topic
         self.difficulty = difficulty
+        self.session = session
+        self._llm = llm
         self.conversation_history = []
         self.session_start_time = datetime.now()
         self.session_metrics = {
@@ -60,7 +68,6 @@ class ConversationAssistant(Agent):
             "speech_rate": 0,
             "clarity_score": 0
         }
-        self._llm = llm
 
         system_prompt = f"""You are an AI conversation practice assistant specializing in {topic} at {difficulty} level.
         Your role is to:
@@ -79,11 +86,11 @@ class ConversationAssistant(Agent):
             self.conversation_history.append({"role": "user", "content": message})
             response = await self.generate_response(message)
             self.conversation_history.append({"role": "assistant", "content": response})
-            await self.say(response)
+            await self.session.say(response)
             self._update_metrics(message)
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
-            await self.say("I encountered an error. Please try again.")
+            await self.session.say("I encountered an error. Please try again.")
 
     def _update_metrics(self, message: str) -> None:
         self.session_metrics["total_speech_time"] += len(message.split()) * 0.3
@@ -147,10 +154,10 @@ async def entrypoint(ctx: agents.JobContext):
             llm=llm,
             tts=deepgram.TTS(model="aura-asteria-en"),
             vad=silero.VAD.load(),
-            #turn_detection=MultilingualModel(),
+            # turn_detection=MultilingualModel(),
         )
 
-        assistant = ConversationAssistant(llm=llm, topic=topic, difficulty=difficulty)
+        assistant = ConversationAssistant(llm=llm, session=session, topic=topic, difficulty=difficulty)
 
         room_input_options = RoomInputOptions()
 
@@ -162,7 +169,7 @@ async def entrypoint(ctx: agents.JobContext):
 
         await ctx.connect()
 
-        await assistant.say(
+        await session.say(
             f"Hello! I'm your {topic} conversation practice assistant. You can start talking whenever you're ready."
         )
 
