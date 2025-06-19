@@ -147,7 +147,7 @@ async def entrypoint(ctx: agents.JobContext):
             llm=llm,
             tts=deepgram.TTS(model="aura-asteria-en"),
             vad=silero.VAD.load(),
-            turn_detection=MultilingualModel(),
+            #turn_detection=MultilingualModel(),
         )
 
         assistant = ConversationAssistant(llm=llm, topic=topic, difficulty=difficulty)
