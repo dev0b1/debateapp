@@ -1,7 +1,5 @@
-"""
-voice_agent_autopilot.py
-Compatible with livekit-agents >= 1.0.0
-"""
+# voice_agent_autopilot.py
+# Compatible with livekit-agents >= 1.0.x
 
 import os, json
 from dotenv import load_dotenv
@@ -9,53 +7,52 @@ from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import Agent, AgentSession, RoomInputOptions
 from livekit.plugins import (
+    openai,            # <-- OpenAI‑compatible plugin
     deepgram,
     cartesia,
     silero,
     noise_cancellation,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-from livekit.plugins.openai import LLM as OpenAILLM
 
-load_dotenv()                               # pulls .env into os.environ
+load_dotenv()          # pulls environment variables from .env
 
 
-# ──────────────────────────  Assistant class  ─────────────────────────── #
-class Assistant(Agent):
-    def __init__(self, topic: str, difficulty: str) -> None:
-        system_prompt = (
-            f"You are a helpful conversation‑practice partner. "
-            f"Topic: {topic}. Level: {difficulty}. "
-            "Keep answers friendly, concise, and encourage the user to speak."
+# ────────────────  Assistant prompt (topic & difficulty)  ─────────────── #
+class ConversationAssistant(Agent):
+    def __init__(self, topic: str, difficulty: str):
+        prompt = (
+            f"You are a helpful conversation‑practice partner.\n"
+            f"Topic: {topic}\n"
+            f"Level: {difficulty}\n"
+            f"Ask follow‑up questions and give concise, friendly answers."
         )
-        super().__init__(instructions=system_prompt)
+        super().__init__(instructions=prompt)
 
 
 # ─────────────────────────────  Entrypoint  ───────────────────────────── #
 async def entrypoint(ctx: agents.JobContext):
-    # 1️⃣  Bring back the metadata you send from Node/Express
+    # 1️⃣  Metadata injected by your Node backend
     meta = json.loads(os.getenv("ROOM_METADATA", "{}"))
     topic = meta.get("topic", "general conversation")
     difficulty = meta.get("difficulty", "intermediate")
 
-    # 2️⃣  Pick an LLM backend (OpenRouter if its key is set, else OpenAI)
-    if os.getenv("OPENROUTER_API_KEY"):
-        llm_plugin = OpenAILLM(
-            model="mistralai/mistral-7b-instruct:free",
-            api_key=os.environ["OPENROUTER_API_KEY"],
-            base_url="https://openrouter.ai/api/v1",
-            extra_headers={
-                "HTTP-Referer": "https://your-site.com",
-                "X-Title": "ConfidenceCompass",
-            },
-        )
-    else:
-        llm_plugin = OpenAILLM(model="gpt-4o-mini")  # needs OPENAI_API_KEY
+    # 2️⃣  LLM plugin → OpenRouter, Gemini‑pro
+    llm_plugin = openai.LLM(
+        model=" mistralai/mistral-7b-instruct:free",                 # Gemini via OpenRouter
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),   # put in .env
+        # OpenRouter asks for these two headers:
+        extra_headers={
+            "HTTP-Referer": "https://your-site.com",
+            "X-Title": "ConfidenceCompass",
+        },
+    )
 
-    # 3️⃣  Build the session ― llm=… enables autopilot
+    # 3️⃣  Build the media session
     session = AgentSession(
         stt=deepgram.STT(model="nova-3", language="multi"),
-        llm=llm_plugin,                         # 👈 autopilot on
+        llm=llm_plugin,                            # 👈 enables autopilot
         tts=cartesia.TTS(
             model="sonic-2",
             voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",
@@ -64,24 +61,22 @@ async def entrypoint(ctx: agents.JobContext):
         turn_detection=MultilingualModel(),
     )
 
-    # 4️⃣  Start the media pipeline
+    # 4️⃣  Start & connect
     await session.start(
         room=ctx.room,
-        agent=Assistant(topic, difficulty),     # just supplies the prompt
+        agent=ConversationAssistant(topic, difficulty),
         room_input_options=RoomInputOptions(
-            noise_cancellation=noise_cancellation.BVC(),  # LK Cloud DSP
+            noise_cancellation=noise_cancellation.BVC(),
         ),
     )
-
     await ctx.connect()
 
-    # 5️⃣  Let autopilot generate the opening line
+    # 5️⃣  Autopilot: have the LLM send the first line
     await session.generate_reply(
-        instructions="Greet the user and offer your assistance."
+        instructions=f"Welcome the user to their {topic} session and invite them to speak."
     )
 
 
-# ────────────────────────────  Worker CLI  ────────────────────────────── #
 if __name__ == "__main__":
     agents.cli.run_app(
         agents.WorkerOptions(entrypoint_fnc=entrypoint)
