@@ -81,12 +81,14 @@ class ConversationAssistant(Agent):
 
     # ✅ Required for LiveKit Agent >= 1.0
     async def on_transcription(self, text: str, is_final: bool, **kwargs):
+        self.logger.info(f"⚠️ on_transcription fired: {text} (final={is_final})")
         if not is_final:
             return
         self.logger.info(f"🗣 Transcription received: {text}")
         await self.on_message(text)
 
     async def on_message(self, message: str) -> None:
+        self.logger.info(f"⚠️ on_message called with: {message}")
         try:
             self.conversation_history.append({"role": "user", "content": message})
             response = await self.generate_response(message)
