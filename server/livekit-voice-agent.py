@@ -55,7 +55,7 @@ async def entrypoint(ctx: agents.JobContext):
             voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",
         ),
         vad=silero.VAD.load(),
-        turn_detection=MultilingualModel(),
+        #turn_detection=MultilingualModel(),
     )
 
     # 4️⃣  Start & connect
