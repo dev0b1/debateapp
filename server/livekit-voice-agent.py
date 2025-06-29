@@ -1,132 +1,88 @@
-import os, json, asyncio, logging
-from datetime import datetime
-from typing import Dict, Any
+"""
+voice_agent_autopilot.py
+Compatible with livekit-agents >= 1.0.0
+"""
+
+import os, json
+from dotenv import load_dotenv
 
 from livekit import agents
 from livekit.agents import Agent, AgentSession, RoomInputOptions
-from livekit.plugins import deepgram, silero
-from openai import OpenAI
-
-# ──────────────────────────────  LOGGING  ────────────────────────────── #
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+from livekit.plugins import (
+    deepgram,
+    cartesia,
+    silero,
+    noise_cancellation,
 )
-log = logging.getLogger("conversation_assistant")
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from livekit.plugins.openai import LLM as OpenAILLM
 
-# ────────────────────────  SIMPLE OpenRouter LLM  ─────────────────────── #
-class OpenRouterLLM:
-    def __init__(self, api_key: str):
-        self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-        )
-        self.model = "mistralai/mistral-7b-instruct:free"
-        self.headers = {
-            "HTTP-Referer": "https://your‑site.com",
-            "X-Title": "ConversationAssistant",
-        }
+load_dotenv()                               # pulls .env into os.environ
 
-    async def chat(self, messages):
-        """Return the assistant’s reply text or raise."""
-        completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            extra_headers=self.headers,
-            timeout=20,          # don’t hang forever
-        )
-        return completion.choices[0].message.content
 
-# ─────────────────────────  ASSISTANT AGENT  ─────────────────────────── #
-class ConversationAssistant(Agent):
-    """A minimal agent that speaks whenever the user finishes a sentence."""
-
-    def __init__(
-        self,
-        session: AgentSession,
-        llm: OpenRouterLLM,
-        topic: str = "general conversation",
-        difficulty: str = "intermediate",
-    ):
-        self.session = session
-        self.llm = llm
-        self.topic = topic
-        self.difficulty = difficulty
-        self.history = []
-        self.started = datetime.now()
-
-        instructions = (
-            f"You are an AI conversation practice partner. "
+# ──────────────────────────  Assistant class  ─────────────────────────── #
+class Assistant(Agent):
+    def __init__(self, topic: str, difficulty: str) -> None:
+        system_prompt = (
+            f"You are a helpful conversation‑practice partner. "
             f"Topic: {topic}. Level: {difficulty}. "
-            "Keep answers friendly and concise."
+            "Keep answers friendly, concise, and encourage the user to speak."
         )
-        super().__init__(instructions=instructions)
+        super().__init__(instructions=system_prompt)
 
-    # ←←←  THIS is the required callback in livekit‑agents ≥ 1.0  →→→
-    async def on_transcription(self, text: str, is_final: bool, **kw):
-        log.info(f"🗣  transcription: {text!r}   final={is_final}")
-        if not is_final:
-            return                              # ignore interim words
-        await self._handle_user_utterance(text)
 
-    # ------------------------------------------------------------------- #
-    async def _handle_user_utterance(self, user_text: str):
-        self.history.append({"role": "user", "content": user_text})
-
-        # 1️⃣ ask the LLM (fallback if it errors)
-        try:
-            reply = await self.llm.chat(
-                [
-                    {"role": "system", "content": "You are a helpful partner."},
-                    *self.history,
-                ]
-            )
-        except Exception as e:
-            log.error(f"LLM error → {e}")
-            reply = "Sorry, I had trouble thinking for a moment."
-
-        self.history.append({"role": "assistant", "content": reply})
-        log.info(f"🗨️  assistant reply: {reply!r}")
-
-        # 2️⃣ speak it
-        await self.session.say(reply)
-
-# ──────────────────────────  ENTRYPOINT  ─────────────────────────────── #
+# ─────────────────────────────  Entrypoint  ───────────────────────────── #
 async def entrypoint(ctx: agents.JobContext):
-    try:
-        meta = json.loads(os.getenv("ROOM_METADATA", "{}"))
-        topic = meta.get("topic", "general conversation")
-        difficulty = meta.get("difficulty", "intermediate")
+    # 1️⃣  Bring back the metadata you send from Node/Express
+    meta = json.loads(os.getenv("ROOM_METADATA", "{}"))
+    topic = meta.get("topic", "general conversation")
+    difficulty = meta.get("difficulty", "intermediate")
 
-        # Create the media session
-        session = AgentSession(
-            stt=deepgram.STT(model="nova-3"),
-            tts=deepgram.TTS(model="aura-asteria-en"),
-            vad=silero.VAD.load(),
+    # 2️⃣  Pick an LLM backend (OpenRouter if its key is set, else OpenAI)
+    if os.getenv("OPENROUTER_API_KEY"):
+        llm_plugin = OpenAILLM(
+            model="mistralai/mistral-7b-instruct:free",
+            api_key=os.environ["OPENROUTER_API_KEY"],
+            base_url="https://openrouter.ai/api/v1",
+            extra_headers={
+                "HTTP-Referer": "https://your-site.com",
+                "X-Title": "ConfidenceCompass",
+            },
         )
+    else:
+        llm_plugin = OpenAILLM(model="gpt-4o-mini")  # needs OPENAI_API_KEY
 
-        llm = OpenRouterLLM(api_key="sk‑openrouter‑xxxxxxxx")  # ← your key
-        agent = ConversationAssistant(session=session, llm=llm,
-                                      topic=topic, difficulty=difficulty)
+    # 3️⃣  Build the session ― llm=… enables autopilot
+    session = AgentSession(
+        stt=deepgram.STT(model="nova-3", language="multi"),
+        llm=llm_plugin,                         # 👈 autopilot on
+        tts=cartesia.TTS(
+            model="sonic-2",
+            voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",
+        ),
+        vad=silero.VAD.load(),
+        turn_detection=MultilingualModel(),
+    )
 
-        # Start and connect
-        await session.start(room=ctx.room, agent=agent,
-                            room_input_options=RoomInputOptions())
-        await ctx.connect()
+    # 4️⃣  Start the media pipeline
+    await session.start(
+        room=ctx.room,
+        agent=Assistant(topic, difficulty),     # just supplies the prompt
+        room_input_options=RoomInputOptions(
+            noise_cancellation=noise_cancellation.BVC(),  # LK Cloud DSP
+        ),
+    )
 
-        # Welcome line
-        await session.say(
-            f"Hi! I’m your {topic} practice partner. Feel free to start talking!"
-        )
+    await ctx.connect()
 
-        # Keep the coroutine alive
-        while True:
-            await asyncio.sleep(1)
+    # 5️⃣  Let autopilot generate the opening line
+    await session.generate_reply(
+        instructions="Greet the user and offer your assistance."
+    )
 
-    except Exception as e:
-        log.exception(f"Fatal: {e}")
-        raise
 
-# ────────────────────────────  CLI  ──────────────────────────────────── #
+# ────────────────────────────  Worker CLI  ────────────────────────────── #
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
+    agents.cli.run_app(
+        agents.WorkerOptions(entrypoint_fnc=entrypoint)
+    )
