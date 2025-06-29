@@ -39,7 +39,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     # 2️⃣  LLM plugin → OpenRouter, Gemini‑pro
     llm_plugin = openai.LLM(
-        model="google/gemini-pro",                 # Gemini via OpenRouter
+        model="mistralai/mistral-small-3.2-24b-instruct:free",                 # Gemini via OpenRouter
         base_url="https://openrouter.ai/api/v1",   # put in .env
         # OpenRouter asks for these two headers:
         api_key=os.getenv("OPENROUTER_API_KEY")
