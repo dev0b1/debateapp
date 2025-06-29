@@ -40,13 +40,9 @@ async def entrypoint(ctx: agents.JobContext):
     # 2️⃣  LLM plugin → OpenRouter, Gemini‑pro
     llm_plugin = openai.LLM(
         model=" mistralai/mistral-7b-instruct:free",                 # Gemini via OpenRouter
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.getenv("OPENROUTER_API_KEY"),   # put in .env
+        base_url="https://openrouter.ai/api/v1",   # put in .env
         # OpenRouter asks for these two headers:
-        extra_headers={
-            "HTTP-Referer": "https://your-site.com",
-            "X-Title": "ConfidenceCompass",
-        },
+        
     )
 
     # 3️⃣  Build the media session
