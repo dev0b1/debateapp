@@ -8,8 +8,6 @@ from datetime import datetime
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
 from livekit.plugins import deepgram, silero
-# from livekit.plugins.turn_detector.multilingual import MultilingualModel
-
 from openai import OpenAI
 
 # Configure logging
@@ -57,7 +55,7 @@ class ConversationAssistant(Agent):
     ) -> None:
         self.topic = topic
         self.difficulty = difficulty
-        self._session = session  # ✅ renamed to avoid collision
+        self._session = session
         self._llm = llm
         self.conversation_history = []
         self.session_start_time = datetime.now()
@@ -80,6 +78,13 @@ class ConversationAssistant(Agent):
         Keep responses concise and natural, as if in a real conversation."""
 
         super().__init__(instructions=system_prompt)
+
+    # ✅ Required for LiveKit Agent >= 1.0
+    async def on_transcription(self, text: str, is_final: bool, **kwargs):
+        if not is_final:
+            return
+        self.logger.info(f"🗣 Transcription received: {text}")
+        await self.on_message(text)
 
     async def on_message(self, message: str) -> None:
         try:
@@ -153,17 +158,14 @@ async def entrypoint(ctx: agents.JobContext):
             stt=deepgram.STT(model="nova-3"),
             tts=deepgram.TTS(model="aura-asteria-en"),
             vad=silero.VAD.load(),
-            # turn_detection=MultilingualModel(),
         )
 
         assistant = ConversationAssistant(llm=llm, session=session, topic=topic, difficulty=difficulty)
 
-        room_input_options = RoomInputOptions()
-
         await session.start(
             room=ctx.room,
             agent=assistant,
-            room_input_options=room_input_options,
+            room_input_options=RoomInputOptions()
         )
 
         await ctx.connect()
