@@ -9,6 +9,43 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCircle, Users, Brain, Mic, Video, AlertTriangle, Settings } from "lucide-react";
 import { LiveKitRoom } from "@/components/conversation/livekit-room";
+import { useCamera } from "@/hooks/use-camera";
+import { useEyeTracking } from "@/hooks/use-eye-tracking";
+import { FaceTrackingDisplay } from "@/components/conversation/face-tracking-display";
+import { EyeContactMetrics } from "@/lib/mediapipe-utils";
+import { FaceTrackingData } from "@/lib/face-tracking-types";
+
+// Helper to transform metrics to FaceTrackingData
+function transformToFaceTrackingData(metrics: EyeContactMetrics | null): FaceTrackingData | null {
+  if (!metrics) return null;
+  const calculateHeadPose = () => {
+    const { x, y, z } = metrics.gazeDirection;
+    const yaw = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
+    const pitch = Math.atan2(-y, Math.sqrt(x * x + z * z)) * (180 / Math.PI);
+    const roll = Math.atan2(z, Math.sqrt(x * x + y * y)) * (180 / Math.PI);
+    return {
+      pitch: Math.max(-45, Math.min(45, pitch)),
+      yaw: Math.max(-45, Math.min(45, yaw)),
+      roll: Math.max(-30, Math.min(30, roll))
+    };
+  };
+  return {
+    eyeContact: {
+      x: metrics.gazeDirection.x,
+      y: metrics.gazeDirection.y,
+      confidence: metrics.confidence,
+      timestamp: Date.now()
+    },
+    headPose: calculateHeadPose(),
+    eyeOpenness: {
+      left: metrics.eyeAspectRatio.left,
+      right: metrics.eyeAspectRatio.right
+    },
+    blinkRate: metrics.blinkRate,
+    faceLandmarks: [],
+    faceDetected: metrics.confidence > 0.5
+  };
+}
 
 export default function AIConversation() {
   const [selectedTopic, setSelectedTopic] = useState<ConversationTopic | null>(null);
@@ -18,6 +55,18 @@ export default function AIConversation() {
   const [setupRequired, setSetupRequired] = useState(false);
   const processingRef = useRef<string | null>(null);
   const { toast } = useToast();
+
+  // Camera and face tracking hooks
+  const { videoRef, startCamera, stopCamera } = useCamera();
+  const [trackingActive, setTrackingActive] = useState(false);
+  const {
+    confidence,
+    currentMetrics,
+    performanceStats
+  } = useEyeTracking(videoRef, trackingActive, {
+    enableVisualization: true,
+    useSimpleDetector: false
+  });
 
   const { data: topics, isLoading } = useQuery({
     queryKey: ["/api/conversation/topics"],
@@ -123,6 +172,18 @@ export default function AIConversation() {
     }
   };
 
+  // Start/stop camera and tracking with conversation
+  useEffect(() => {
+    if (isInConversation && roomData) {
+      startCamera();
+      setTrackingActive(true);
+    } else {
+      stopCamera();
+      setTrackingActive(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInConversation, roomData]);
+
   if (isInConversation && roomData) {
     return (
       <div className="p-6 space-y-6">
@@ -138,11 +199,52 @@ export default function AIConversation() {
             End Conversation
           </Button>
         </div>
-
-        <LiveKitRoom 
-          roomData={roomData}
-          onEnd={endConversation}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left: Video + Face Tracking */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Video className="w-5 h-5" />
+                  Video Feed & Face Tracking
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Face tracking overlay canvas */}
+                  <canvas
+                    id="face-tracking-canvas"
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+                    style={{ maxWidth: '100%', height: 'auto', aspectRatio: '4/3' }}
+                  />
+                </div>
+                <div className="mt-4">
+                  <FaceTrackingDisplay
+                    faceTrackingData={transformToFaceTrackingData(currentMetrics)}
+                    confidence={confidence}
+                    isActive={trackingActive}
+                    videoRef={videoRef}
+                    performanceStats={performanceStats}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          {/* Right: LiveKitRoom */}
+          <div>
+            <LiveKitRoom 
+              roomData={roomData}
+              onEnd={endConversation}
+            />
+          </div>
+        </div>
       </div>
     );
   }
