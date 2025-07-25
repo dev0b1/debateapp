@@ -12,7 +12,7 @@ import { useEyeTracking } from "../hooks/use-eye-tracking";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
-import { Play, Square, Video, Mic, MicOff, Eye, Brain, Settings, Info } from "lucide-react";
+import { Play, Square, Video, Mic, MicOff, Eye, Brain, Settings } from "lucide-react";
 import { EyeTrackingPoint, VoiceMetric } from "@shared/schema";
 import { EyeContactMetrics } from "@/lib/mediapipe-utils";
 import { FaceTrackingData } from "@/lib/face-tracking-types";
@@ -20,7 +20,7 @@ import { FaceTrackingData } from "@/lib/face-tracking-types";
 interface SessionData {
   title: string;
   duration: number;
-  attentionScore: number;
+  eyeContactScore: number;
   voiceClarity: number;
   speakingPace: number;
   volumeLevel: number;
@@ -179,7 +179,7 @@ export default function PracticeSession() {
 
     // Calculate session metrics with proper type checks
     const duration = sessionTimer;
-    const attentionScore = eyeTrackingData?.length > 0 
+    const eyeContactScore = eyeTrackingData?.length > 0 
       ? eyeTrackingData.reduce((sum, data) => sum + (data.confidence ?? 0), 0) / eyeTrackingData.length * 100
       : 0;
 
@@ -195,13 +195,13 @@ export default function PracticeSession() {
       ? voiceMetrics.reduce((sum, metric) => sum + (metric.volume ?? 0), 0) / voiceMetrics.length
       : 0;
 
-    const overallScore = (attentionScore + avgVoiceClarity + avgSpeakingPace) / 3;
+    const overallScore = (eyeContactScore + avgVoiceClarity + avgSpeakingPace) / 3;
 
     // Save session with proper type checking
     await createSessionMutation.mutateAsync({
       title,
       duration,
-      attentionScore: attentionScore / 100,
+      eyeContactScore: eyeContactScore / 100,
       voiceClarity: avgVoiceClarity / 100,
       speakingPace: avgSpeakingPace / 100,
       volumeLevel: avgVolumeLevel / 100,
@@ -269,7 +269,7 @@ export default function PracticeSession() {
                 {isInitialized && (
                   <Badge variant="default" className="bg-green-600">
                     <Eye className="w-3 h-3 mr-1" />
-                    Attention to Interviewer Active
+                    Attention to Interviewer
                   </Badge>
                 )}
                 {hasEnhancedAnalyzer && (
@@ -299,7 +299,7 @@ export default function PracticeSession() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Video className="w-5 h-5" />
-                  Video Feed & Face Tracking
+                  Video Feed & Attention to Interviewer
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -401,7 +401,7 @@ export default function PracticeSession() {
             <TabsContent value="basic-metrics" className="mt-4">
               <MetricsPanel
                 voiceMetrics={voiceMetrics}
-                attentionScore={confidence * 100}
+                eyeContactScore={confidence * 100} // This is now 'Attention to Interviewer' score
                 sessionTimer={formatTime(sessionTimer)}
                 overallScore={Math.round((confidence * 100 + audioLevel) / 2)}
                 isActive={sessionActive}
@@ -428,10 +428,6 @@ export default function PracticeSession() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Attention to Interviewer</span>
                       <Badge variant={confidence > 0.7 ? "default" : confidence > 0.5 ? "secondary" : "destructive"}>
-                        Attention to Interviewer
-                        <span title="This measures whether your face is visible and well-positioned for the camera, which is important for video interviews. It does not measure true eye contact.">
-                          <Info className="inline w-3 h-3 ml-1 text-muted-foreground" />
-                        </span>
                         {Math.round(confidence * 100)}%
                       </Badge>
                     </div>
@@ -516,7 +512,7 @@ export default function PracticeSession() {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="text-sm text-muted-foreground space-y-2">
-                <p>• Look directly at the camera for attention to interviewer</p>
+                <p>• Look directly at the camera for eye contact</p>
                 <p>• Maintain steady head position</p>
                 <p>• Speak clearly and at moderate pace</p>
                 <p>• Avoid filler words like "um" and "uh"</p>

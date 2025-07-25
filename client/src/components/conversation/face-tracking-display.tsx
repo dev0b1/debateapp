@@ -24,8 +24,6 @@ export function FaceTrackingDisplay({
   videoRef, 
   performanceStats 
 }: FaceTrackingDisplayProps) {
-  // Null check to prevent errors
-  if (!faceTrackingData) return null;
   // Draw face landmarks and gaze visualization
   useEffect(() => {
     const canvas = document.getElementById('face-tracking-canvas') as HTMLCanvasElement;
@@ -42,14 +40,9 @@ export function FaceTrackingDisplay({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw faint center guide (crosshair)
-    drawCenterGuide(ctx, canvas.width, canvas.height);
-
     // Draw face landmarks if available
     if (faceTrackingData.faceLandmarks && faceTrackingData.faceLandmarks.length > 0) {
       drawFaceLandmarks(ctx, faceTrackingData.faceLandmarks, canvas.width, canvas.height);
-      // Draw improved face box overlay
-      drawFaceBox(ctx, faceTrackingData.faceLandmarks, canvas.width, canvas.height, faceTrackingData.eyeContact, faceTrackingData.confidence);
     } else if (faceTrackingData.faceDetected) {
       // Draw basic face outline if no landmarks but face is detected
       drawBasicFaceOutline(ctx, canvas.width, canvas.height);
@@ -411,99 +404,6 @@ export function FaceTrackingDisplay({
           </CardContent>
         </Card>
       </div>
-      {/* Floating feedback message */}
-      {isActive && (
-        <div style={{
-          position: 'absolute',
-          top: 12,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 20,
-          background: 'rgba(255,255,255,0.92)',
-          borderRadius: 12,
-          padding: '6px 18px',
-          fontWeight: 500,
-          color: '#222',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-        }}>
-          {(!faceTrackingData.faceDetected || confidence < 0.3) ? (
-            'No face detected'
-          ) : (Math.abs(faceCenterX - canvasCenterX) < centerThreshold && Math.abs(faceCenterY - canvasCenterY) < centerThreshold) ? (
-            'Great! You’re well positioned.'
-          ) : (
-            'Move closer to the center.'
-          )}
-        </div>
-      )}
     </div>
   );
-}
-
-function drawFaceBox(ctx: CanvasRenderingContext2D, landmarks: any[], width: number, height: number, eyeContact: any, confidence: number) {
-  // Use only outermost facial landmarks for bounding box (jawline, forehead, chin)
-  // MediaPipe jawline: 0-16, forehead: 10, 338, 297, 332, chin: 152
-  const indices = [0, 16, 10, 338, 297, 332, 152];
-  const points = indices.map(i => landmarks[i]).filter(Boolean);
-  if (points.length < 3) return;
-  const xs = points.map(pt => pt.x * width);
-  const ys = points.map(pt => pt.y * height);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  // Calculate center of face box
-  const faceCenterX = (minX + maxX) / 2;
-  const faceCenterY = (minY + maxY) / 2;
-  // Calculate distance from canvas center
-  const canvasCenterX = width / 2;
-  const canvasCenterY = height / 2;
-  const dx = Math.abs(faceCenterX - canvasCenterX);
-  const dy = Math.abs(faceCenterY - canvasCenterY);
-  const centerThreshold = Math.min(width, height) * 0.12; // 12% of canvas size
-  let color = '#00FF00'; // green
-  if (dx > centerThreshold || dy > centerThreshold) {
-    color = '#FFD600'; // yellow
-  }
-  if (confidence < 0.3) {
-    color = '#FF3333'; // red
-  }
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.setLineDash([]);
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  // Rounded rectangle
-  const radius = 18;
-  ctx.moveTo(minX + radius, minY);
-  ctx.lineTo(maxX - radius, minY);
-  ctx.quadraticCurveTo(maxX, minY, maxX, minY + radius);
-  ctx.lineTo(maxX, maxY - radius);
-  ctx.quadraticCurveTo(maxX, maxY, maxX - radius, maxY);
-  ctx.lineTo(minX + radius, maxY);
-  ctx.quadraticCurveTo(minX, maxY, minX, maxY - radius);
-  ctx.lineTo(minX, minY + radius);
-  ctx.quadraticCurveTo(minX, minY, minX + radius, minY);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawCenterGuide(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 6]);
-  // Vertical line
-  ctx.beginPath();
-  ctx.moveTo(width / 2, height * 0.2);
-  ctx.lineTo(width / 2, height * 0.8);
-  ctx.stroke();
-  // Horizontal line
-  ctx.beginPath();
-  ctx.moveTo(width * 0.2, height / 2);
-  ctx.lineTo(width * 0.8, height / 2);
-  ctx.stroke();
-  ctx.restore();
 }
