@@ -24,6 +24,8 @@ export function FaceTrackingDisplay({
   videoRef, 
   performanceStats 
 }: FaceTrackingDisplayProps) {
+  // Null check to prevent errors
+  if (!faceTrackingData) return null;
   // Draw face landmarks and gaze visualization
   useEffect(() => {
     const canvas = document.getElementById('face-tracking-canvas') as HTMLCanvasElement;
