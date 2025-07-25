@@ -227,13 +227,14 @@ export function useEyeTracking(
           fps: Math.min(60, Math.max(0, fps))
         });
 
-        if (enableVisualization && canvasRef.current) {
-          if (detectorType === 'mediapipe') {
-            eyeTrackerRef.current.drawAnnotations(canvasRef.current, result as EyeGazeResult);
-          } else {
-            simpleDetectorRef.current.drawAnnotations(canvasRef.current, result as SimpleFaceResult);
-          }
-        }
+        // Remove canvas drawing to prevent conflicts with FaceTrackingDisplay
+        // if (enableVisualization && canvasRef.current) {
+        //   if (detectorType === 'mediapipe') {
+        //     eyeTrackerRef.current.drawAnnotations(canvasRef.current, result as EyeGazeResult);
+        //   } else {
+        //     simpleDetectorRef.current.drawAnnotations(canvasRef.current, result as SimpleFaceResult);
+        //   }
+        // }
       }
     } catch (error) {
       console.error("Error processing eye tracking frame:", error);
