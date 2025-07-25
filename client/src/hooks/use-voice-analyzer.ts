@@ -34,10 +34,12 @@ import { useRoomContext } from "@livekit/components-react";
 interface VoiceAnalyzerOptions {
   enableDeepgram?: boolean;
   deepgramApiKey?: string;
+  requireLiveKit?: boolean; // NEW: only use LiveKit if true
 }
 
 export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
-  const room = useRoomContext();
+  // Only use LiveKit room context if required
+  const room = options.requireLiveKit ? useRoomContext() : undefined;
   const [audioLevel, setAudioLevel] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceMetrics, setVoiceMetrics] = useState<VoiceMetric[]>([]);

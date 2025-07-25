@@ -101,6 +101,7 @@ export default function PracticeSession() {
   } = useVoiceAnalyzer({
     enableDeepgram: true,
     deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY
+    // No requireLiveKit: PracticeSession does not use LiveKit
   });
 
   const { 
