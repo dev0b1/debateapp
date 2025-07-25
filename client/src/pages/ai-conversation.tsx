@@ -12,7 +12,7 @@ import { LiveKitRoom } from "@/components/conversation/livekit-room";
 import { useCamera } from "@/hooks/use-camera";
 import { useEyeTracking } from "@/hooks/use-eye-tracking";
 import { FaceTrackingDisplay } from "@/components/conversation/face-tracking-display";
-import { EyeContactMetrics } from "@/lib/mediapipe-utils";
+// Removed MediaPipe import - using simple detector instead
 import { FaceTrackingData } from "@/lib/face-tracking-types";
 
 export default function AIConversation() {
@@ -128,35 +128,33 @@ export default function AIConversation() {
     }
   };
 
-  // Helper to transform metrics to FaceTrackingData (copied from practice-session)
-  function transformToFaceTrackingData(metrics: EyeContactMetrics | null): FaceTrackingData | null {
-    if (!metrics) return null;
-    const calculateHeadPose = () => {
-      const { x, y, z } = metrics.gazeDirection;
-      const yaw = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
-      const pitch = Math.atan2(-y, Math.sqrt(x * x + z * z)) * (180 / Math.PI);
-      const roll = Math.atan2(z, Math.sqrt(x * x + y * y)) * (180 / Math.PI);
-      return {
-        pitch: Math.max(-45, Math.min(45, pitch)),
-        yaw: Math.max(-45, Math.min(45, yaw)),
-        roll: Math.max(-30, Math.min(30, roll))
-      };
-    };
+  // Helper to transform metrics to FaceTrackingData (updated for both server and simple detector)
+  function transformToFaceTrackingData(eyeTrackingData: any, currentMetrics: any): FaceTrackingData | null {
+    if (!eyeTrackingData || !currentMetrics) return null;
+    
+    // Use data from either server or simple detector
+    const metrics = eyeTrackingData.metrics;
+    const detectorType = eyeTrackingData.detectorType || 'simple';
+    
     return {
       eyeContact: {
-        x: metrics.gazeDirection.x,
-        y: metrics.gazeDirection.y,
-        confidence: metrics.confidence,
+        x: metrics.eyeContact.x,
+        y: metrics.eyeContact.y,
+        confidence: metrics.eyeContact.confidence,
         timestamp: Date.now()
       },
-      headPose: calculateHeadPose(),
+      headPose: {
+        pitch: metrics.headPose?.x || 0,
+        yaw: metrics.headPose?.y || 0,
+        roll: metrics.headPose?.z || 0
+      },
       eyeOpenness: {
         left: metrics.eyeAspectRatio.left,
         right: metrics.eyeAspectRatio.right
       },
       blinkRate: metrics.blinkRate,
-      faceLandmarks: [],
-      faceDetected: metrics.confidence > 0.5
+      faceLandmarks: eyeTrackingData.landmarks || [],
+      faceDetected: eyeTrackingData.faceDetected
     };
   }
 
@@ -170,13 +168,15 @@ export default function AIConversation() {
       toggleVideo
     } = useCamera();
     const {
+      eyeTrackingData,
       confidence,
       currentMetrics,
       isInitialized,
       performanceStats
     } = useEyeTracking(videoRef, true, {
       enableVisualization: true,
-      useSimpleDetector: false
+      useSimpleDetector: true,
+      preferServerDetection: true
     });
     // Start camera on mount, stop on unmount
     useEffect(() => {
@@ -238,7 +238,7 @@ export default function AIConversation() {
             </Card>
             <div className="mt-4">
               <FaceTrackingDisplay
-                faceTrackingData={transformToFaceTrackingData(currentMetrics)}
+                faceTrackingData={transformToFaceTrackingData(eyeTrackingData, currentMetrics)}
                 confidence={confidence}
                 isActive={true}
                 videoRef={videoRef}

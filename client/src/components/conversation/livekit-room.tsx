@@ -18,7 +18,7 @@ import { MetricsPanel } from "../practice/metrics-panel";
 import { FaceTrackingDisplay } from "../conversation/face-tracking-display";
 import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
 import { useCamera } from "../../hooks/use-camera";
-import { EyeContactMetrics } from "@/lib/mediapipe-utils";
+// Removed MediaPipe import - using simple detector instead
 import { FaceTrackingData } from "@/lib/face-tracking-types";
 import { Play, Square, Video, Mic, MicOff, Eye, Brain, Settings } from "lucide-react";
 
@@ -32,37 +32,32 @@ interface LiveKitRoomProps {
   onEnd: () => void;
 }
 
-function transformToFaceTrackingData(metrics: EyeContactMetrics | null): FaceTrackingData | null {
-  if (!metrics) return null;
-
-  const calculateHeadPose = () => {
-    const { x, y, z } = metrics.gazeDirection;
-    const yaw = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
-    const pitch = Math.atan2(-y, Math.sqrt(x * x + z * z)) * (180 / Math.PI);
-    const roll = Math.atan2(z, Math.sqrt(x * x + y * y)) * (180 / Math.PI);
-
-    return {
-      pitch: Math.max(-45, Math.min(45, pitch)),
-      yaw: Math.max(-45, Math.min(45, yaw)),
-      roll: Math.max(-30, Math.min(30, roll))
-    };
-  };
-
+function transformToFaceTrackingData(eyeTrackingData: any, currentMetrics: any): FaceTrackingData | null {
+  if (!eyeTrackingData || !currentMetrics) return null;
+  
+  // Use data from either server or simple detector
+  const metrics = eyeTrackingData.metrics;
+  const detectorType = eyeTrackingData.detectorType || 'simple';
+  
   return {
     eyeContact: {
-      x: metrics.gazeDirection.x,
-      y: metrics.gazeDirection.y,
-      confidence: metrics.confidence,
+      x: metrics.eyeContact.x,
+      y: metrics.eyeContact.y,
+      confidence: metrics.eyeContact.confidence,
       timestamp: Date.now()
     },
-    headPose: calculateHeadPose(),
+    headPose: {
+      pitch: metrics.headPose?.x || 0,
+      yaw: metrics.headPose?.y || 0,
+      roll: metrics.headPose?.z || 0
+    },
     eyeOpenness: {
       left: metrics.eyeAspectRatio.left,
       right: metrics.eyeAspectRatio.right
     },
     blinkRate: metrics.blinkRate,
-    faceLandmarks: [],
-    faceDetected: metrics.confidence > 0.5
+    faceLandmarks: eyeTrackingData.landmarks || [],
+    faceDetected: eyeTrackingData.faceDetected
   };
 }
 
@@ -104,7 +99,8 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     isInitialized: isEyeTrackingInitialized
   } = useEyeTracking(videoRef, isConnected, {
     enableVisualization: true,
-    performanceMode: true
+    useSimpleDetector: true,
+    preferServerDetection: true
   });
 
   // Enhanced voice analyzer
@@ -431,7 +427,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
               
               <TabsContent value="face-tracking" className="mt-4">
                 <FaceTrackingDisplay
-                  faceTrackingData={transformToFaceTrackingData(currentMetrics)}
+                  faceTrackingData={transformToFaceTrackingData(eyeTrackingData, currentMetrics)}
                   confidence={confidence}
                   isActive={isConnected}
                   videoRef={videoRef}

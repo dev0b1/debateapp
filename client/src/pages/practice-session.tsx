@@ -14,7 +14,6 @@ import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { Play, Square, Video, Mic, MicOff, Eye, Brain, Settings } from "lucide-react";
 import { EyeTrackingPoint, VoiceMetric } from "@shared/schema";
-import { EyeContactMetrics } from "@/lib/mediapipe-utils";
 import { FaceTrackingData } from "@/lib/face-tracking-types";
 
 interface SessionData {
@@ -29,40 +28,32 @@ interface SessionData {
   voiceMetrics: VoiceMetric[];
 }
 
-function transformToFaceTrackingData(metrics: EyeContactMetrics | null): FaceTrackingData | null {
-  if (!metrics) return null;
+function transformToFaceTrackingData(eyeTrackingData: any, currentMetrics: any): FaceTrackingData | null {
+  if (!eyeTrackingData || !currentMetrics) return null;
   
-  // Calculate head pose from gaze direction (MediaPipe provides more accurate data)
-  const calculateHeadPose = () => {
-    const { x, y, z } = metrics.gazeDirection;
-    
-    // Convert gaze direction to head pose angles
-    const yaw = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
-    const pitch = Math.atan2(-y, Math.sqrt(x * x + z * z)) * (180 / Math.PI);
-    const roll = Math.atan2(z, Math.sqrt(x * x + y * y)) * (180 / Math.PI);
-    
-    return {
-      pitch: Math.max(-45, Math.min(45, pitch)), // Clamp to reasonable range
-      yaw: Math.max(-45, Math.min(45, yaw)),
-      roll: Math.max(-30, Math.min(30, roll))
-    };
-  };
+  // Use data from either server or simple detector
+  const metrics = eyeTrackingData.metrics;
+  const detectorType = eyeTrackingData.detectorType || 'simple';
   
   return {
     eyeContact: {
-      x: metrics.gazeDirection.x,
-      y: metrics.gazeDirection.y,
-      confidence: metrics.confidence,
+      x: metrics.eyeContact.x,
+      y: metrics.eyeContact.y,
+      confidence: metrics.eyeContact.confidence,
       timestamp: Date.now()
     },
-    headPose: calculateHeadPose(),
+    headPose: {
+      pitch: metrics.headPose?.x || 0,
+      yaw: metrics.headPose?.y || 0,
+      roll: metrics.headPose?.z || 0
+    },
     eyeOpenness: {
       left: metrics.eyeAspectRatio.left,
       right: metrics.eyeAspectRatio.right
     },
     blinkRate: metrics.blinkRate,
-    faceLandmarks: [], // MediaPipe landmarks will be provided by the detector
-    faceDetected: metrics.confidence > 0.5
+    faceLandmarks: eyeTrackingData.landmarks || [],
+    faceDetected: eyeTrackingData.faceDetected
   };
 }
 
@@ -109,10 +100,12 @@ export default function PracticeSession() {
     confidence, 
     currentMetrics,
     isInitialized,
-    performanceStats
+    performanceStats,
+    detectorType
   } = useEyeTracking(videoRef, sessionActive, {
     enableVisualization: true,
-    useSimpleDetector: false // Try MediaPipe first, fallback to simple detector
+    useSimpleDetector: true,
+    preferServerDetection: true
   });
 
   const createSessionMutation = useMutation({
@@ -293,7 +286,7 @@ export default function PracticeSession() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Video Feed and Controls */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Enhanced Camera Feed with MediaPipe Overlay */}
+          {/* Enhanced Camera Feed with Face Tracking Overlay */}
           {sessionActive && (
             <Card>
               <CardHeader>
@@ -323,7 +316,7 @@ export default function PracticeSession() {
                   />
                   {/* Always render FaceTrackingDisplay for overlay */}
                   <FaceTrackingDisplay
-                    faceTrackingData={transformToFaceTrackingData(currentMetrics)}
+                    faceTrackingData={transformToFaceTrackingData(eyeTrackingData, currentMetrics)}
                     confidence={confidence}
                     isActive={sessionActive}
                     videoRef={videoRef}
@@ -458,6 +451,13 @@ export default function PracticeSession() {
                         </div>
                       </>
                     )}
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Detection Method</span>
+                      <Badge variant={detectorType === 'server' ? "default" : "secondary"}>
+                        {detectorType === 'server' ? 'MediaPipe Server' : 'Simple Detector'}
+                      </Badge>
+                    </div>
 
                     {enhancedMetrics && (
                       <>

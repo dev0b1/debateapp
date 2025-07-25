@@ -14,3 +14,8 @@ torch==2.7.1+cpu
 torchaudio==2.7.1+cpu
 httpx>=0.28.1
 websockets>=12.0 
+# Head Pose Detection Dependencies
+opencv-python>=4.8.0
+mediapipe>=0.10.0
+flask>=2.3.0
+flask-cors>=4.0.0 
