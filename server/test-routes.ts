@@ -12,7 +12,7 @@ testRouter.get("/api/health", (req, res) => {
       voiceAnalysis: !!process.env.DEEPGRAM_API_KEY && !process.env.DEEPGRAM_API_KEY.includes('your_'),
       aiConversation: !!process.env.OPENROUTER_API_KEY && !process.env.OPENROUTER_API_KEY.includes('your_'),
       realtimeCommunication: liveKitService.isLiveKitConfigured(),
-      eyeTracking: true, // Always available (client-side)
+      attentionTracking: true, // Always available (client-side)
       sessionRecording: true // Always available (in-memory)
     },
     environment: process.env.NODE_ENV || "development"

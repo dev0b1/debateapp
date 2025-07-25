@@ -12,7 +12,7 @@ import { useEyeTracking } from "../hooks/use-eye-tracking";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
-import { Play, Square, Video, Mic, MicOff, Eye, Brain, Settings } from "lucide-react";
+import { Play, Square, Video, Mic, MicOff, Eye, Brain, Settings, Info } from "lucide-react";
 import { EyeTrackingPoint, VoiceMetric } from "@shared/schema";
 import { EyeContactMetrics } from "@/lib/mediapipe-utils";
 import { FaceTrackingData } from "@/lib/face-tracking-types";
@@ -20,7 +20,7 @@ import { FaceTrackingData } from "@/lib/face-tracking-types";
 interface SessionData {
   title: string;
   duration: number;
-  eyeContactScore: number;
+  attentionScore: number;
   voiceClarity: number;
   speakingPace: number;
   volumeLevel: number;
@@ -179,7 +179,7 @@ export default function PracticeSession() {
 
     // Calculate session metrics with proper type checks
     const duration = sessionTimer;
-    const eyeContactScore = eyeTrackingData?.length > 0 
+    const attentionScore = eyeTrackingData?.length > 0 
       ? eyeTrackingData.reduce((sum, data) => sum + (data.confidence ?? 0), 0) / eyeTrackingData.length * 100
       : 0;
 
@@ -195,13 +195,13 @@ export default function PracticeSession() {
       ? voiceMetrics.reduce((sum, metric) => sum + (metric.volume ?? 0), 0) / voiceMetrics.length
       : 0;
 
-    const overallScore = (eyeContactScore + avgVoiceClarity + avgSpeakingPace) / 3;
+    const overallScore = (attentionScore + avgVoiceClarity + avgSpeakingPace) / 3;
 
     // Save session with proper type checking
     await createSessionMutation.mutateAsync({
       title,
       duration,
-      eyeContactScore: eyeContactScore / 100,
+      attentionScore: attentionScore / 100,
       voiceClarity: avgVoiceClarity / 100,
       speakingPace: avgSpeakingPace / 100,
       volumeLevel: avgVolumeLevel / 100,
@@ -269,7 +269,7 @@ export default function PracticeSession() {
                 {isInitialized && (
                   <Badge variant="default" className="bg-green-600">
                     <Eye className="w-3 h-3 mr-1" />
-                    Eye Tracking Active
+                    Attention to Interviewer Active
                   </Badge>
                 )}
                 {hasEnhancedAnalyzer && (
@@ -294,75 +294,76 @@ export default function PracticeSession() {
         {/* Video Feed and Controls */}
         <div className="lg:col-span-2 space-y-6">
           {/* Enhanced Camera Feed with MediaPipe Overlay */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Video className="w-5 h-5" />
-                Video Feed & Face Tracking
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-                {/* Face tracking overlay canvas */}
-                <canvas
-                  id="face-tracking-canvas"
-                  className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
-                  style={{ 
-                    maxWidth: '100%',
-                    height: 'auto',
-                    aspectRatio: '4/3'
-                  }}
-                />
-              </div>
-              
-              {/* Camera Controls */}
-              <div className="flex items-center justify-center space-x-4 mt-4">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={toggleVideo}
-                  className="w-12 h-12 rounded-full"
-                >
-                  <Video className={`h-5 w-5 ${isVideoEnabled ? 'text-gray-600' : 'text-red-600'}`} />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={toggleMute}
-                  className="w-12 h-12 rounded-full"
-                >
-                  {isRecording ? (
-                    <Mic className="h-5 w-5 text-gray-600" />
-                  ) : (
-                    <MicOff className="h-5 w-5 text-red-600" />
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={resetAnalysis}
-                  className="flex items-center gap-2"
-                >
-                  <Settings className="w-4 h-4" />
-                  Reset Analysis
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {sessionActive && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Video className="w-5 h-5" />
+                  Video Feed & Face Tracking
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Face tracking overlay canvas */}
+                  <canvas
+                    id="face-tracking-canvas"
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+                    style={{ 
+                      maxWidth: '100%',
+                      height: 'auto',
+                      aspectRatio: '4/3'
+                    }}
+                  />
+                </div>
+                {/* Camera Controls */}
+                <div className="flex items-center justify-center space-x-4 mt-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={toggleVideo}
+                    className="w-12 h-12 rounded-full"
+                  >
+                    <Video className={`h-5 w-5 ${isVideoEnabled ? 'text-gray-600' : 'text-red-600'}`} />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={toggleMute}
+                    className="w-12 h-12 rounded-full"
+                  >
+                    {isRecording ? (
+                      <Mic className="h-5 w-5 text-gray-600" />
+                    ) : (
+                      <MicOff className="h-5 w-5 text-red-600" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetAnalysis}
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Reset Analysis
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Enhanced Analysis Tabs */}
           <Tabs defaultValue="face-tracking" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="face-tracking" className="flex items-center gap-2">
                 <Eye className="w-4 h-4" />
-                Face Tracking
+                Attention to Interviewer
               </TabsTrigger>
               <TabsTrigger value="voice-analysis" className="flex items-center gap-2">
                 <Mic className="w-4 h-4" />
@@ -400,7 +401,7 @@ export default function PracticeSession() {
             <TabsContent value="basic-metrics" className="mt-4">
               <MetricsPanel
                 voiceMetrics={voiceMetrics}
-                eyeContactScore={confidence * 100}
+                attentionScore={confidence * 100}
                 sessionTimer={formatTime(sessionTimer)}
                 overallScore={Math.round((confidence * 100 + audioLevel) / 2)}
                 isActive={sessionActive}
@@ -425,8 +426,12 @@ export default function PracticeSession() {
                     </div>
                     
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Eye Contact</span>
+                      <span className="text-sm text-muted-foreground">Attention to Interviewer</span>
                       <Badge variant={confidence > 0.7 ? "default" : confidence > 0.5 ? "secondary" : "destructive"}>
+                        Attention to Interviewer
+                        <span title="This measures whether your face is visible and well-positioned for the camera, which is important for video interviews. It does not measure true eye contact.">
+                          <Info className="inline w-3 h-3 ml-1 text-muted-foreground" />
+                        </span>
                         {Math.round(confidence * 100)}%
                       </Badge>
                     </div>
@@ -511,7 +516,7 @@ export default function PracticeSession() {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="text-sm text-muted-foreground space-y-2">
-                <p>• Look directly at the camera for eye contact</p>
+                <p>• Look directly at the camera for attention to interviewer</p>
                 <p>• Maintain steady head position</p>
                 <p>• Speak clearly and at moderate pace</p>
                 <p>• Avoid filler words like "um" and "uh"</p>

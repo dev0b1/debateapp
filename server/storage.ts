@@ -67,7 +67,7 @@ export class MemStorage implements IStorage {
     await this.updateUserProgress(id, {
       userId: id,
       totalSessions: 0,
-      avgEyeContact: 0,
+      avgAttention: 0,
       avgVoiceClarity: 0,
       avgSpeakingPace: 0,
       totalPracticeTime: 0,
@@ -84,13 +84,13 @@ export class MemStorage implements IStorage {
       userId: insertSession.userId,
       title: insertSession.title,
       duration: insertSession.duration,
-      eyeContactScore: insertSession.eyeContactScore,
+      attentionScore: insertSession.attentionScore,
       voiceClarity: insertSession.voiceClarity,
       speakingPace: insertSession.speakingPace,
       volumeLevel: insertSession.volumeLevel,
       overallScore: insertSession.overallScore,
       recordingUrl: insertSession.recordingUrl || null,
-      eyeTrackingData: insertSession.eyeTrackingData || null,
+      attentionData: insertSession.attentionData || null,
       voiceMetrics: insertSession.voiceMetrics || null,
       sessionType: insertSession.sessionType || "practice",
       conversationTopic: insertSession.conversationTopic || null,
@@ -143,7 +143,7 @@ export class MemStorage implements IStorage {
         id,
         userId,
         totalSessions: 0,
-        avgEyeContact: 0,
+        avgAttention: 0,
         avgVoiceClarity: 0,
         avgSpeakingPace: 0,
         totalPracticeTime: 0,
@@ -178,7 +178,7 @@ export class MemStorage implements IStorage {
 
     return {
       totalSessions: progress?.totalSessions || 0,
-      avgEyeContact: progress?.avgEyeContact || 0,
+      avgAttention: progress?.avgAttention || 0,
       avgVoiceClarity: progress?.avgVoiceClarity || 0,
       avgSpeakingPace: progress?.avgSpeakingPace || 0,
       totalPracticeTime: progress?.totalPracticeTime || 0,
@@ -193,13 +193,13 @@ export class MemStorage implements IStorage {
     if (!currentProgress) return;
 
     const totalSessions = currentProgress.totalSessions + 1;
-    const newAvgEyeContact = ((currentProgress.avgEyeContact * currentProgress.totalSessions) + session.eyeContactScore) / totalSessions;
+    const newAvgAttention = ((currentProgress.avgAttention * currentProgress.totalSessions) + session.attentionScore) / totalSessions;
     const newAvgVoiceClarity = ((currentProgress.avgVoiceClarity * currentProgress.totalSessions) + session.voiceClarity) / totalSessions;
     const newAvgSpeakingPace = ((currentProgress.avgSpeakingPace * currentProgress.totalSessions) + session.speakingPace) / totalSessions;
 
     await this.updateUserProgress(session.userId, {
       totalSessions,
-      avgEyeContact: newAvgEyeContact,
+      avgAttention: newAvgAttention,
       avgVoiceClarity: newAvgVoiceClarity,
       avgSpeakingPace: newAvgSpeakingPace,
       totalPracticeTime: currentProgress.totalPracticeTime + session.duration,

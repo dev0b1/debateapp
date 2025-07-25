@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Camera, Mic, Bell, Shield, Download } from "lucide-react";
+import { Settings as SettingsIcon, Camera, Mic, Bell, Shield, Download, Info } from "lucide-react";
 
 export default function Settings() {
   return (
@@ -103,7 +103,7 @@ export default function Settings() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Eye contact reminders</Label>
+                  <Label>Attention to Interviewer <span title="This measures whether your face is visible and well-positioned for the camera, which is important for video interviews. It does not measure true eye contact."><Info className="inline w-3 h-3 ml-1 text-muted-foreground" /></span></Label>
                   <p className="text-sm text-gray-600">Visual cues when looking away</p>
                 </div>
                 <Switch defaultChecked />

@@ -14,13 +14,13 @@ export const sessions = pgTable("sessions", {
   userId: integer("user_id").notNull(),
   title: text("title").notNull(),
   duration: integer("duration").notNull(), // in seconds
-  eyeContactScore: real("eye_contact_score").notNull(),
+  attentionScore: real("attention_score").notNull(),
   voiceClarity: real("voice_clarity").notNull(),
   speakingPace: real("speaking_pace").notNull(),
   volumeLevel: real("volume_level").notNull(),
   overallScore: real("overall_score").notNull(),
   recordingUrl: text("recording_url"),
-  eyeTrackingData: jsonb("eye_tracking_data"), // stores eye position data over time
+  attentionData: jsonb("attention_data"), // stores eye position data over time
   voiceMetrics: jsonb("voice_metrics"), // stores voice analysis data
   sessionType: text("session_type").notNull().default("practice"), // "practice" or "conversation"
   conversationTopic: text("conversation_topic"), // topic ID for conversation sessions
@@ -32,7 +32,7 @@ export const userProgress = pgTable("user_progress", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   totalSessions: integer("total_sessions").notNull().default(0),
-  avgEyeContact: real("avg_eye_contact").notNull().default(0),
+  avgAttention: real("avg_attention").notNull().default(0),
   avgVoiceClarity: real("avg_voice_clarity").notNull().default(0),
   avgSpeakingPace: real("avg_speaking_pace").notNull().default(0),
   totalPracticeTime: integer("total_practice_time").notNull().default(0), // in seconds
@@ -63,7 +63,7 @@ export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
 export type UserProgress = typeof userProgress.$inferSelect;
 
 // Additional types for real-time data
-export interface EyeTrackingPoint {
+export interface AttentionPoint {
   x: number;
   y: number;
   confidence: number;
@@ -80,7 +80,7 @@ export interface VoiceMetric {
 
 export interface SessionStats {
   totalSessions: number;
-  avgEyeContact: number;
+  avgAttention: number;
   avgVoiceClarity: number;
   avgSpeakingPace: number;
   totalPracticeTime: number;

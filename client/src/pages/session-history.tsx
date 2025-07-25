@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Video, Play, Download, Trash2, Filter } from "lucide-react";
+import { Video, Play, Download, Trash2, Filter, Info } from "lucide-react";
 import { Session } from "@shared/schema";
 
 export default function SessionHistory() {
@@ -117,8 +117,12 @@ export default function SessionHistory() {
                           {new Date(session.createdAt).toLocaleDateString()} • {Math.floor(session.duration / 60)}m {session.duration % 60}s
                         </p>
                         <div className="flex items-center space-x-4 mt-2">
-                          <Badge className={getScoreColor(session.eyeContactScore)}>
-                            Eye Contact: {Math.round(session.eyeContactScore * 100)}%
+                          <Badge className={getScoreColor(session.attentionScore)}>
+                            Attention to Interviewer
+                            <span title="This measures whether your face is visible and well-positioned for the camera, which is important for video interviews. It does not measure true eye contact.">
+                              <Info className="inline w-3 h-3 ml-1 text-muted-foreground" />
+                            </span>
+                            {Math.round(session.attentionScore * 100)}%
                           </Badge>
                           <Badge className={getScoreColor(session.voiceClarity)}>
                             Voice: {getGrade(session.voiceClarity)}
