@@ -112,7 +112,7 @@ export default function PracticeSession() {
     performanceStats
   } = useEyeTracking(videoRef, sessionActive, {
     enableVisualization: true,
-    useSimpleDetector: true // Force simple detector to avoid MediaPipe crashes
+    useSimpleDetector: false // Try MediaPipe first, fallback to simple detector
   });
 
   const createSessionMutation = useMutation({
