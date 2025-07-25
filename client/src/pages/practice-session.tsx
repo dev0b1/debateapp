@@ -321,6 +321,14 @@ export default function PracticeSession() {
                       aspectRatio: '4/3'
                     }}
                   />
+                  {/* Always render FaceTrackingDisplay for overlay */}
+                  <FaceTrackingDisplay
+                    faceTrackingData={transformToFaceTrackingData(currentMetrics)}
+                    confidence={confidence}
+                    isActive={sessionActive}
+                    videoRef={videoRef}
+                    performanceStats={performanceStats}
+                  />
                 </div>
                 {/* Camera Controls */}
                 <div className="flex items-center justify-center space-x-4 mt-4">
@@ -376,13 +384,7 @@ export default function PracticeSession() {
             </TabsList>
             
             <TabsContent value="face-tracking" className="mt-4">
-              <FaceTrackingDisplay
-                faceTrackingData={transformToFaceTrackingData(currentMetrics)}
-                confidence={confidence}
-                isActive={sessionActive}
-                videoRef={videoRef}
-                performanceStats={performanceStats}
-              />
+              {/* This content is now rendered directly in the video card */}
             </TabsContent>
             
             <TabsContent value="voice-analysis" className="mt-4">
