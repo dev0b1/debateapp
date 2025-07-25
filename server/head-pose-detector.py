@@ -3,31 +3,54 @@ import mediapipe as mp
 import numpy as np
 import time
 import base64
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import json
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+import asyncio
+from typing import Optional
+import logging
 
-app = Flask(__name__)
-CORS(app)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize MediaPipe
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-def process_frame_for_head_pose(image_data):
+# Pydantic models for request/response
+class HeadPoseRequest(BaseModel):
+    image: str
+
+class HeadPoseResponse(BaseModel):
+    face_detected: bool
+    head_pose: dict
+    direction: str
+    confidence: float
+    landmarks: list
+    error: Optional[str] = None
+
+def process_frame_for_head_pose(image_data: str) -> HeadPoseResponse:
     """
     Process a video frame and return head pose data
-    image_data: base64 encoded image or numpy array
+    image_data: base64 encoded image
     """
     try:
-        # Convert base64 to numpy array if needed
-        if isinstance(image_data, str):
-            # Assuming base64 encoded image
-            image_bytes = base64.b64decode(image_data)
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        else:
-            image = image_data
+        # Convert base64 to numpy array
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if image is None:
+            return HeadPoseResponse(
+                face_detected=False,
+                head_pose={'x': 0, 'y': 0, 'z': 0},
+                direction='Invalid Image',
+                confidence=0,
+                landmarks=[],
+                error='Failed to decode image'
+            )
         
         # Convert BGR to RGB
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -116,56 +139,75 @@ def process_frame_for_head_pose(image_data):
                         'z': lm.z
                     })
                 
-                return {
-                    'face_detected': True,
-                    'head_pose': {
-                        'x': float(x),
-                        'y': float(y),
-                        'z': float(z)
-                    },
-                    'direction': direction,
-                    'confidence': confidence,
-                    'landmarks': landmarks[:100]  # Limit to first 100 landmarks
-                }
+                return HeadPoseResponse(
+                    face_detected=True,
+                    head_pose={'x': float(x), 'y': float(y), 'z': float(z)},
+                    direction=direction,
+                    confidence=confidence,
+                    landmarks=landmarks[:100]  # Limit to first 100 landmarks
+                )
         
         # No face detected
-        return {
-            'face_detected': False,
-            'head_pose': {'x': 0, 'y': 0, 'z': 0},
-            'direction': 'No Face Detected',
-            'confidence': 0,
-            'landmarks': []
-        }
+        return HeadPoseResponse(
+            face_detected=False,
+            head_pose={'x': 0, 'y': 0, 'z': 0},
+            direction='No Face Detected',
+            confidence=0,
+            landmarks=[]
+        )
         
     except Exception as e:
-        return {
-            'face_detected': False,
-            'error': str(e),
-            'head_pose': {'x': 0, 'y': 0, 'z': 0},
-            'direction': 'Error',
-            'confidence': 0,
-            'landmarks': []
-        }
+        logger.error(f"Error processing head pose: {str(e)}")
+        return HeadPoseResponse(
+            face_detected=False,
+            head_pose={'x': 0, 'y': 0, 'z': 0},
+            direction='Error',
+            confidence=0,
+            landmarks=[],
+            error=str(e)
+        )
 
-@app.route('/detect-head-pose', methods=['POST'])
-def detect_head_pose():
+# Create FastAPI app
+app = FastAPI(title="Head Pose Detector", version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.post("/detect-head-pose", response_model=HeadPoseResponse)
+async def detect_head_pose(request: HeadPoseRequest):
+    """Detect head pose from base64 encoded image"""
     try:
-        data = request.get_json()
-        image_data = data.get('image')
+        if not request.image:
+            raise HTTPException(status_code=400, detail="No image data provided")
         
-        if not image_data:
-            return jsonify({'error': 'No image data provided'}), 400
-        
-        result = process_frame_for_head_pose(image_data)
-        return jsonify(result)
+        result = process_frame_for_head_pose(request.image)
+        return result
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in detect_head_pose endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({'status': 'healthy', 'service': 'head-pose-detector'})
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": "head-pose-detector"}
+
+# Function to start the server programmatically
+def start_head_pose_server(host: str = "127.0.0.1", port: int = 5001):
+    """Start the head pose detector server"""
+    logger.info(f"Starting Head Pose Detection Service on {host}:{port}...")
+    uvicorn.run(app, host=host, port=port, log_level="info")
+
+# Function to run the server in a separate process
+def run_head_pose_server():
+    """Run the head pose detector server (for standalone use)"""
+    start_head_pose_server()
 
 if __name__ == '__main__':
-    print("Starting Head Pose Detection Service on port 5001...")
-    app.run(host='0.0.0.0', port=5001, debug=True) 
+    run_head_pose_server() 

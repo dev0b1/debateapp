@@ -3,6 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import router from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { createServer } from "http";
+import { headPoseManager } from "./head-pose-manager";
 
 // Set NODE_ENV if not already set
 if (!process.env.NODE_ENV) {
@@ -98,9 +99,20 @@ app.use((req, res, next) => {
     log(`🌍 Environment: ${process.env.NODE_ENV}`);
     
     if (missingVars.length > 0) {
-      log(`⚠️  Some features may not work - missing ${missingVars.length} environment variables`);
-    } else {
-      log(`✅ All required environment variables are configured`);
+      log(`⚠️  Missing environment variables: ${missingVars.join(', ')}`);
     }
+  });
+
+  // Graceful shutdown
+  process.on('SIGINT', async () => {
+    log('🛑 Shutting down server...');
+    await headPoseManager.stop();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    log('🛑 Shutting down server...');
+    await headPoseManager.stop();
+    process.exit(0);
   });
 })();

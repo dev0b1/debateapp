@@ -4,6 +4,7 @@ import { insertSessionSchema } from "@shared/schema";
 import { z } from "zod";
 import { conversationTopics, getTopicById } from "./conversation-topics";
 import { liveKitService } from "./livekit-service";
+import { headPoseManager } from "./head-pose-manager";
 import testRouter from "./test-routes";
 
 const router = Router();
@@ -31,6 +32,54 @@ router.get("/api/user/progress", async (req, res) => {
   }
 });
 
+// Head pose detector management routes
+router.post("/api/head-pose/start", async (req, res) => {
+  try {
+    const success = await headPoseManager.start();
+    if (success) {
+      res.json({ 
+        success: true, 
+        message: "Head pose detector started successfully",
+        serverUrl: headPoseManager.getServerUrl()
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to start head pose detector" 
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: "Error starting head pose detector",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+router.post("/api/head-pose/stop", async (req, res) => {
+  try {
+    await headPoseManager.stop();
+    res.json({ 
+      success: true, 
+      message: "Head pose detector stopped successfully" 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: "Error stopping head pose detector",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+router.get("/api/head-pose/status", (req, res) => {
+  res.json({
+    isRunning: headPoseManager.isServerRunning(),
+    serverUrl: headPoseManager.getServerUrl()
+  });
+});
+
 // Create a new practice session
 router.post("/api/sessions", async (req, res) => {
   try {
@@ -38,6 +87,12 @@ router.post("/api/sessions", async (req, res) => {
       ...req.body,
       userId: 1 // Default demo user
     });
+    
+    // Start head pose detector for practice sessions
+    if (!headPoseManager.isServerRunning()) {
+      console.log('Starting head pose detector for practice session...');
+      await headPoseManager.start();
+    }
     
     const session = await storage.createSession(validatedData);
     res.status(201).json(session);
@@ -117,6 +172,12 @@ router.post("/api/conversation/create-room", async (req, res) => {
         message: "Please set up your LiveKit credentials in the .env file to use AI conversation features.",
         setupRequired: true
       });
+    }
+
+    // Start head pose detector for AI conversations
+    if (!headPoseManager.isServerRunning()) {
+      console.log('Starting head pose detector for AI conversation...');
+      await headPoseManager.start();
     }
 
     const topic = getTopicById(topicId);

@@ -49,9 +49,57 @@ export class HeadPoseService {
   private isAvailable: boolean = false;
   private lastCheck: number = 0;
   private checkInterval: number = 30000; // 30 seconds
+  private apiBaseUrl: string;
 
-  constructor(serverUrl: string = 'http://localhost:5001') {
+  constructor(serverUrl: string = 'http://127.0.0.1:5001', apiBaseUrl: string = 'http://localhost:5000') {
     this.serverUrl = serverUrl;
+    this.apiBaseUrl = apiBaseUrl;
+  }
+
+  async startServer(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/head-pose/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Head pose detector started:', data.message);
+        return true;
+      } else {
+        console.error('Failed to start head pose detector');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error starting head pose detector:', error);
+      return false;
+    }
+  }
+
+  async stopServer(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/head-pose/stop`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Head pose detector stopped:', data.message);
+        return true;
+      } else {
+        console.error('Failed to stop head pose detector');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error stopping head pose detector:', error);
+      return false;
+    }
   }
 
   async checkAvailability(): Promise<boolean> {
@@ -61,16 +109,22 @@ export class HeadPoseService {
     }
 
     try {
-      const response = await fetch(`${this.serverUrl}/health`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        this.isAvailable = data.status === 'healthy';
+      // First check if the server is running via our API
+      const statusResponse = await fetch(`${this.apiBaseUrl}/api/head-pose/status`);
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        if (statusData.isRunning) {
+          // Then check if the Python server is responding
+          const healthResponse = await fetch(`${this.serverUrl}/health`);
+          if (healthResponse.ok) {
+            const data = await healthResponse.json();
+            this.isAvailable = data.status === 'healthy';
+          } else {
+            this.isAvailable = false;
+          }
+        } else {
+          this.isAvailable = false;
+        }
       } else {
         this.isAvailable = false;
       }
@@ -84,8 +138,21 @@ export class HeadPoseService {
   }
 
   async detectHeadPose(videoElement: HTMLVideoElement): Promise<HeadPoseResult | null> {
+    // Try to start the server if it's not available
     if (!await this.checkAvailability()) {
-      return null;
+      console.log('Head pose detector not available, attempting to start...');
+      const started = await this.startServer();
+      if (!started) {
+        return null;
+      }
+      
+      // Wait a bit for the server to fully start
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Check availability again
+      if (!await this.checkAvailability()) {
+        return null;
+      }
     }
 
     try {
