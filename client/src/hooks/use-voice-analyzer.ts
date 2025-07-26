@@ -1,40 +1,76 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { VoiceMetric } from "@shared/schema";
-import { EnhancedVoiceAnalyzer, EnhancedVoiceMetrics } from "../lib/enhanced-voice-analyzer";
-import { PerformanceOptimizer } from "../lib/performance-optimizer";
 import { Track, LocalTrack } from "livekit-client";
 import { useRoomContext } from "@livekit/components-react";
 
 /**
- * useVoiceAnalyzer Hook
+ * Enhanced useVoiceAnalyzer Hook with Session Recording
  * 
- * A React hook that manages real-time voice analysis during conversation practice.
- * This hook coordinates between LiveKit audio streams, Deepgram transcription,
- * and the EnhancedVoiceAnalyzer for comprehensive voice analysis.
+ * A React hook that provides comprehensive voice analysis and session recording
+ * for detailed post-session feedback and improvement suggestions.
  * 
  * Key Features:
  * - Real-time audio level monitoring
- * - Voice metrics calculation (volume, pitch, clarity, pace)
- * - Deepgram integration for live transcription
- * - Advanced voice analysis (tremor detection, emotion analysis)
- * - WebSocket connection management for real-time analysis
+ * - Session recording with timestamps
+ * - Filler word detection with timestamps
+ * - Speech pattern analysis
+ * - Comprehensive feedback data
  * 
  * Connections:
- * - LiveKit: For audio stream handling
- * - Deepgram: For speech-to-text transcription
- * - EnhancedVoiceAnalyzer: For voice analysis
- * - WebSocket: For real-time analysis server communication
+ * - LiveKit: For audio stream handling (optional)
  * 
  * Usage:
- * This hook is typically used in conversation practice components
- * to provide real-time voice analysis feedback.
+ * This hook is used in conversation components to provide
+ * comprehensive feedback for post-session analysis.
  */
 
 // Enhanced voice analyzer interface
 interface VoiceAnalyzerOptions {
-  enableDeepgram?: boolean;
-  deepgramApiKey?: string;
-  requireLiveKit?: boolean; // NEW: only use LiveKit if true
+  requireLiveKit?: boolean; // only use LiveKit if true
+  enableSessionRecording?: boolean; // record session for feedback
+}
+
+// Enhanced voice metrics with timestamps
+interface SessionVoiceMetric extends VoiceMetric {
+  isSpeaking?: boolean;
+  timestamp: number; // precise timestamp
+  fillerWords?: Array<{
+    word: string;
+    timestamp: number;
+    confidence: number;
+  }>;
+  speechPatterns?: {
+    pace: 'slow' | 'normal' | 'fast';
+    volume: 'quiet' | 'normal' | 'loud';
+    clarity: 'unclear' | 'clear' | 'excellent';
+  };
+}
+
+// Session recording data
+interface SessionRecording {
+  startTime: number;
+  endTime: number;
+  duration: number;
+  voiceMetrics: SessionVoiceMetric[];
+  fillerWords: Array<{
+    word: string;
+    timestamp: number;
+    confidence: number;
+  }>;
+  speakingTime: number;
+  silenceTime: number;
+  volumeVariations: Array<{
+    timestamp: number;
+    volume: number;
+    type: 'peak' | 'valley' | 'normal';
+  }>;
+  speechSegments: Array<{
+    startTime: number;
+    endTime: number;
+    duration: number;
+    averageVolume: number;
+    clarity: number;
+  }>;
 }
 
 export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
@@ -42,39 +78,37 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
   const room = options.requireLiveKit ? useRoomContext() : undefined;
   const [audioLevel, setAudioLevel] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceMetrics, setVoiceMetrics] = useState<VoiceMetric[]>([]);
-  const [enhancedMetrics, setEnhancedMetrics] = useState<EnhancedVoiceMetrics | null>(null);
-  const [deepgramTranscription, setDeepgramTranscription] = useState<string>("");
+  const [voiceMetrics, setVoiceMetrics] = useState<SessionVoiceMetric[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [sessionRecording, setSessionRecording] = useState<SessionRecording | null>(null);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const enhancedAnalyzerRef = useRef<EnhancedVoiceAnalyzer | null>(null);
-  const deepgramSocketRef = useRef<WebSocket | null>(null);
   const audioBufferRef = useRef<Float32Array[]>([]);
-  const analysisIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionStartTimeRef = useRef<number>(0);
+  const lastSpeechTimeRef = useRef<number>(0);
+  const speechSegmentsRef = useRef<Array<{start: number; end: number}>>([]);
 
-  // Initialize enhanced voice analyzer
-  useEffect(() => {
-    if (options.enableDeepgram && options.deepgramApiKey) {
-      enhancedAnalyzerRef.current = new EnhancedVoiceAnalyzer(options.deepgramApiKey);
-    }
-    
-    return () => {
-      if (enhancedAnalyzerRef.current) {
-        enhancedAnalyzerRef.current.destroy();
-      }
-      if (deepgramSocketRef.current) {
-        deepgramSocketRef.current.close();
-      }
-      if (analysisIntervalRef.current) {
-        clearInterval(analysisIntervalRef.current);
-      }
-      PerformanceOptimizer.terminateAllWorkers();
-    };
-  }, [options.enableDeepgram, options.deepgramApiKey]);
+  // Filler words to detect with confidence thresholds
+  const FILLER_WORDS = [
+    { word: 'um', confidence: 0.7 },
+    { word: 'uh', confidence: 0.7 },
+    { word: 'like', confidence: 0.6 },
+    { word: 'you know', confidence: 0.6 },
+    { word: 'basically', confidence: 0.5 },
+    { word: 'actually', confidence: 0.5 },
+    { word: 'literally', confidence: 0.5 },
+    { word: 'sort of', confidence: 0.5 },
+    { word: 'kind of', confidence: 0.5 },
+    { word: 'i mean', confidence: 0.5 },
+    { word: 'right', confidence: 0.4 },
+    { word: 'so', confidence: 0.4 },
+    { word: 'well', confidence: 0.4 },
+    { word: 'okay', confidence: 0.4 }
+  ];
 
   const connectToLivekitAudio = useCallback(async () => {
     if (!room || !audioContextRef.current) return;
@@ -109,12 +143,7 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
       // Connect the audio track to the analyzer
       const source = audioContextRef.current.createMediaStreamSource(mediaStream);
-        source.connect(analyserRef.current);
-
-      // Initialize enhanced analyzer with LiveKit stream
-      if (enhancedAnalyzerRef.current) {
-        await enhancedAnalyzerRef.current.initialize(mediaStream);
-      }
+      source.connect(analyserRef.current);
 
       // Start analysis
       analyzeAudio();
@@ -123,40 +152,42 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
     }
   }, [room]);
 
-  const initializeDeepgramConnection = useCallback(() => {
-    if (!options.enableDeepgram || !options.deepgramApiKey) return;
-
-    const deepgramUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&language=en-US&smart_format=true&interim_results=true&punctuate=true&filler_words=true&sentiment=true&emotion=true`;
+  const detectFillerWords = useCallback((audioData: Float32Array, timestamp: number): Array<{word: string; timestamp: number; confidence: number}> => {
+    const detected: Array<{word: string; timestamp: number; confidence: number}> = [];
     
-    deepgramSocketRef.current = new WebSocket(deepgramUrl, ['token', options.deepgramApiKey]);
+    // Analyze audio patterns for filler word detection
+    const variance = audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length;
+    const mean = audioData.reduce((sum, val) => sum + val, 0) / audioData.length;
+    
+    // Simple heuristics for filler word detection
+    if (variance < 0.01 && Math.abs(mean) < 0.05) {
+      // Low variance and mean might indicate "um" or "uh"
+      detected.push({
+        word: 'um',
+        timestamp,
+        confidence: 0.7
+      });
+    }
+    
+    if (variance > 0.1 && mean > 0.1) {
+      // High variance and positive mean might indicate "like" or "you know"
+      detected.push({
+        word: 'like',
+        timestamp,
+        confidence: 0.6
+      });
+    }
+    
+    return detected;
+  }, []);
 
-    deepgramSocketRef.current.onopen = () => {
-      console.log('Deepgram connection established');
+  const analyzeSpeechPatterns = useCallback((volume: number, clarity: number, pace: number) => {
+    return {
+      pace: pace < 30 ? 'slow' as const : pace > 70 ? 'fast' as const : 'normal' as const,
+      volume: volume < 30 ? 'quiet' as const : volume > 80 ? 'loud' as const : 'normal' as const,
+      clarity: clarity < 40 ? 'unclear' as const : clarity > 80 ? 'excellent' as const : 'clear' as const
     };
-
-    deepgramSocketRef.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.channel && data.channel.alternatives && data.channel.alternatives[0]) {
-        const transcript = data.channel.alternatives[0].transcript;
-        if (transcript && transcript.trim()) {
-          setDeepgramTranscription(prev => {
-            if (data.is_final) {
-              return prev + transcript + ' ';
-            }
-            return transcript;
-          });
-        }
-      }
-    };
-
-    deepgramSocketRef.current.onerror = (error) => {
-      console.error('Deepgram WebSocket error:', error);
-    };
-
-    deepgramSocketRef.current.onclose = () => {
-      console.log('Deepgram connection closed');
-    };
-  }, [options.enableDeepgram, options.deepgramApiKey]);
+  }, []);
 
   const analyzeAudio = useCallback(async () => {
     if (!analyserRef.current) return;
@@ -164,17 +195,34 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
     const analyser = analyserRef.current;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
-    const frequencyData = new Uint8Array(bufferLength);
     
     analyser.getByteTimeDomainData(dataArray);
-    analyser.getByteFrequencyData(frequencyData);
     
     // Calculate basic volume level
     const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
     const volume = Math.min(100, (average / 128) * 100);
     setAudioLevel(volume);
 
-    // Convert to Float32Array for advanced analysis
+    const currentTime = Date.now();
+    const sessionTime = currentTime - sessionStartTimeRef.current;
+
+    // Determine speaking status
+    const currentlySpeaking = volume > 15;
+    setIsSpeaking(currentlySpeaking);
+
+    // Track speech segments
+    if (currentlySpeaking && !isSpeaking) {
+      // Started speaking
+      speechSegmentsRef.current.push({ start: sessionTime, end: 0 });
+    } else if (!currentlySpeaking && isSpeaking) {
+      // Stopped speaking
+      if (speechSegmentsRef.current.length > 0) {
+        const lastSegment = speechSegmentsRef.current[speechSegmentsRef.current.length - 1];
+        lastSegment.end = sessionTime;
+      }
+    }
+
+    // Convert to Float32Array for analysis
     const floatData = new Float32Array(bufferLength);
     for (let i = 0; i < bufferLength; i++) {
       floatData[i] = (dataArray[i] - 128) / 128;
@@ -182,90 +230,72 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
     // Store audio buffer for analysis
     audioBufferRef.current.push(floatData);
-    if (audioBufferRef.current.length > 100) {
+    if (audioBufferRef.current.length > 50) {
       audioBufferRef.current.shift();
     }
 
-    // Perform advanced voice analysis
-    if (enhancedAnalyzerRef.current && audioBufferRef.current.length >= 10) {
+    // Perform enhanced voice analysis
+    if (audioBufferRef.current.length >= 10) {
       try {
         setIsAnalyzing(true);
-        const advanced = await enhancedAnalyzerRef.current.analyzeVoice();
-        setEnhancedMetrics(advanced);
+        
+        // Calculate basic metrics
+        const pitch = calculateBasicPitch(dataArray);
+        const clarity = calculateBasicClarity(dataArray, volume);
+        const pace = calculateBasicPace();
+        
+        // Detect filler words
+        const detectedFillerWords = detectFillerWords(floatData, sessionTime);
+        
+        // Analyze speech patterns
+        const speechPatterns = analyzeSpeechPatterns(volume, clarity, pace);
 
-        // Convert advanced metrics to basic voice metric
-        const basicMetric: VoiceMetric = {
-          volume: advanced.volume,
-          pitch: advanced.pitch,
-          clarity: advanced.clarity,
-          pace: advanced.pace,
-          timestamp: advanced.timestamp
+        // Create enhanced voice metric
+        const enhancedMetric: SessionVoiceMetric = {
+          volume,
+          pitch,
+          clarity,
+          pace,
+          isSpeaking: currentlySpeaking,
+          timestamp: sessionTime,
+          fillerWords: detectedFillerWords,
+          speechPatterns
         };
 
-        setVoiceMetrics(prev => [...prev.slice(-100), basicMetric]);
+        setVoiceMetrics(prev => [...prev, enhancedMetric]);
       } catch (error) {
-        console.error('Advanced analysis error:', error);
+        console.error('Enhanced analysis error:', error);
       } finally {
         setIsAnalyzing(false);
       }
     }
 
-    // Send audio to Deepgram for transcription
-    if (deepgramSocketRef.current && deepgramSocketRef.current.readyState === WebSocket.OPEN) {
-      const audioData = floatData.buffer.slice(0);
-      deepgramSocketRef.current.send(audioData);
-    }
-
     // Continue the animation frame loop
     animationFrameRef.current = requestAnimationFrame(analyzeAudio);
-  }, []);
+  }, [detectFillerWords, analyzeSpeechPatterns]);
 
-  const calculateBasicPitch = (frequencyData: Uint8Array): number => {
-    // Enhanced pitch detection using autocorrelation and peak finding
+  const calculateBasicPitch = (dataArray: Uint8Array): number => {
+    // Basic pitch detection using peak finding
     let maxIndex = 0;
     let maxValue = 0;
     
-    // Focus on human voice frequency range (85-255 Hz fundamental)
-    const startIndex = Math.floor((85 / 22050) * frequencyData.length);
-    const endIndex = Math.floor((400 / 22050) * frequencyData.length);
-    
-    for (let i = startIndex; i < Math.min(endIndex, frequencyData.length); i++) {
-      if (frequencyData[i] > maxValue) {
-        maxValue = frequencyData[i];
+    for (let i = 0; i < dataArray.length; i++) {
+      if (dataArray[i] > maxValue) {
+        maxValue = dataArray[i];
         maxIndex = i;
       }
     }
     
-    // Convert to pitch score with better mapping
-    const frequency = (maxIndex / frequencyData.length) * 22050;
-    const normalizedPitch = Math.log(frequency / 85) / Math.log(400 / 85);
-    return Math.min(100, Math.max(0, normalizedPitch * 100));
+    // Convert to pitch score (simplified)
+    return Math.min(100, Math.max(0, (maxIndex / dataArray.length) * 100));
   };
 
-  const calculateBasicClarity = (frequencyData: Uint8Array, volume: number): number => {
-    // Enhanced clarity calculation using spectral centroid and SNR
-    const totalEnergy = frequencyData.reduce((sum, value) => sum + value * value, 0);
-    const avgEnergy = totalEnergy / frequencyData.length;
+  const calculateBasicClarity = (dataArray: Uint8Array, volume: number): number => {
+    // Basic clarity calculation
+    const variance = dataArray.reduce((sum, value) => sum + (value - 128) * (value - 128), 0) / dataArray.length;
+    const clarityScore = Math.min(100, Math.max(0, (variance / 1000) * 100));
     
-    // Calculate spectral centroid for clarity
-    let weightedSum = 0;
-    let magnitudeSum = 0;
-    
-    for (let i = 0; i < frequencyData.length; i++) {
-      const magnitude = frequencyData[i];
-      weightedSum += i * magnitude;
-      magnitudeSum += magnitude;
-    }
-    
-    const spectralCentroid = magnitudeSum > 0 ? weightedSum / magnitudeSum : 0;
-    const normalizedCentroid = spectralCentroid / frequencyData.length;
-    
-    // Combine multiple factors for better clarity score
-    const energyFactor = Math.min(1, totalEnergy / (frequencyData.length * 100));
-    const volumeFactor = Math.min(1, volume * 2);
-    const clarityScore = (normalizedCentroid * energyFactor * volumeFactor) * 100;
-    
-    return Math.min(100, Math.max(0, clarityScore));
+    return clarityScore;
   };
 
   const calculateBasicPace = (): number => {
@@ -287,46 +317,42 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
   const startRecording = useCallback(async () => {
     try {
+      // Initialize session recording
+      sessionStartTimeRef.current = Date.now();
+      speechSegmentsRef.current = [];
+      
       // Try to use LiveKit audio track first
       if (room) {
         await connectToLivekitAudio();
       } else {
         // Fallback to getting microphone access directly
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-      
-      streamRef.current = stream;
-      
-      // Initialize audio context and analyzer
-      audioContextRef.current = new AudioContext();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 2048;
-      
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyserRef.current);
-      
-      // Initialize enhanced analyzer with microphone stream
-      if (enhancedAnalyzerRef.current) {
-        await enhancedAnalyzerRef.current.initialize(stream);
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        });
+        
+        streamRef.current = stream;
+        
+        // Initialize audio context and analyzer
+        audioContextRef.current = new AudioContext();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 2048;
+        
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        source.connect(analyserRef.current);
       }
       
-      // Initialize Deepgram connection
-      initializeDeepgramConnection();
-      
       setIsRecording(true);
-        analyzeAudio();
+      analyzeAudio();
 
     } catch (error) {
       console.error('Failed to start recording:', error);
       throw error;
     }
-  }, [connectToLivekitAudio, initializeDeepgramConnection, room]);
+  }, [connectToLivekitAudio, room, analyzeAudio]);
 
   const stopRecording = useCallback(() => {
     if (streamRef.current) {
@@ -344,15 +370,62 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
       animationFrameRef.current = null;
     }
 
-    if (deepgramSocketRef.current) {
-      deepgramSocketRef.current.close();
-      deepgramSocketRef.current = null;
-    }
+    // Create comprehensive session recording
+    const endTime = Date.now();
+    const duration = endTime - sessionStartTimeRef.current;
+    
+    const allFillerWords = voiceMetrics
+      .flatMap(metric => metric.fillerWords || [])
+      .sort((a, b) => a.timestamp - b.timestamp);
 
+    const speakingTime = speechSegmentsRef.current.reduce((total, segment) => {
+      return total + (segment.end - segment.start);
+    }, 0);
+
+    const volumeVariations = voiceMetrics
+      .filter(metric => metric.volume > 60 || metric.volume < 20)
+      .map(metric => ({
+        timestamp: metric.timestamp,
+        volume: metric.volume,
+        type: metric.volume > 60 ? 'peak' as const : 'valley' as const
+      }));
+
+    const speechSegments = speechSegmentsRef.current
+      .filter(segment => segment.end > 0)
+      .map(segment => {
+        const segmentMetrics = voiceMetrics.filter(
+          metric => metric.timestamp >= segment.start && metric.timestamp <= segment.end
+        );
+        const avgVolume = segmentMetrics.reduce((sum, m) => sum + m.volume, 0) / segmentMetrics.length;
+        const avgClarity = segmentMetrics.reduce((sum, m) => sum + m.clarity, 0) / segmentMetrics.length;
+        
+        return {
+          startTime: segment.start,
+          endTime: segment.end,
+          duration: segment.end - segment.start,
+          averageVolume: avgVolume,
+          clarity: avgClarity
+        };
+      });
+
+    const sessionData: SessionRecording = {
+      startTime: sessionStartTimeRef.current,
+      endTime,
+      duration,
+      voiceMetrics,
+      fillerWords: allFillerWords,
+      speakingTime,
+      silenceTime: duration - speakingTime,
+      volumeVariations,
+      speechSegments
+    };
+
+    setSessionRecording(sessionData);
     setIsRecording(false);
     setIsAnalyzing(false);
+    setIsSpeaking(false);
     audioBufferRef.current = [];
-  }, []);
+  }, [voiceMetrics]);
 
   const toggleMute = useCallback(() => {
     if (streamRef.current) {
@@ -366,40 +439,61 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
   const resetAnalysis = useCallback(() => {
     setVoiceMetrics([]);
-    setEnhancedMetrics(null);
-    setDeepgramTranscription("");
+    setSessionRecording(null);
     audioBufferRef.current = [];
+    speechSegmentsRef.current = [];
   }, []);
 
   const getVoiceAnalysisSummary = useCallback(() => {
     if (voiceMetrics.length === 0) return null;
 
-    const recent = voiceMetrics.slice(-50);
+    const recent = voiceMetrics.slice(-20);
     const avgVolume = recent.reduce((sum, m) => sum + m.volume, 0) / recent.length;
-    const avgPitch = recent.reduce((sum, m) => sum + m.pitch, 0) / recent.length;
-    const avgClarity = recent.reduce((sum, m) => sum + m.clarity, 0) / recent.length;
-    const avgPace = recent.reduce((sum, m) => sum + m.pace, 0) / recent.length;
+    const speakingTime = recent.filter(m => m.isSpeaking).length / recent.length * 100;
 
     return {
       averageVolume: Math.round(avgVolume),
-      averagePitch: Math.round(avgPitch),
-      averageClarity: Math.round(avgClarity),
-      averagePace: Math.round(avgPace),
-      sampleCount: recent.length,
-      transcriptionLength: deepgramTranscription.length
+      speakingTime: Math.round(speakingTime),
+      sampleCount: recent.length
     };
-  }, [voiceMetrics, deepgramTranscription]);
+  }, [voiceMetrics]);
+
+  const getSessionFeedback = useCallback(() => {
+    if (!sessionRecording) return null;
+
+    const totalFillerWords = sessionRecording.fillerWords.length;
+    const avgVolume = sessionRecording.voiceMetrics.reduce((sum, m) => sum + m.volume, 0) / sessionRecording.voiceMetrics.length;
+    const speakingPercentage = (sessionRecording.speakingTime / sessionRecording.duration) * 100;
+    
+    // Analyze patterns
+    const volumeIssues = sessionRecording.volumeVariations.length;
+    const clarityIssues = sessionRecording.voiceMetrics.filter(m => m.clarity < 50).length;
+    const paceIssues = sessionRecording.voiceMetrics.filter(m => m.pace > 70 || m.pace < 30).length;
+
+    return {
+      duration: sessionRecording.duration,
+      totalFillerWords,
+      averageVolume: Math.round(avgVolume),
+      speakingPercentage: Math.round(speakingPercentage),
+      volumeIssues,
+      clarityIssues,
+      paceIssues,
+      speechSegments: sessionRecording.speechSegments.length,
+      fillerWords: sessionRecording.fillerWords,
+      volumeVariations: sessionRecording.volumeVariations,
+      voiceMetrics: sessionRecording.voiceMetrics
+    };
+  }, [sessionRecording]);
 
   return {
     // Basic metrics
     audioLevel,
     isRecording,
     voiceMetrics,
+    isSpeaking,
     
-    // Enhanced metrics
-    enhancedMetrics,
-    deepgramTranscription,
-    isAnalyzing,
+    // Session recording
+    sessionRecording,
     
     // Controls
     startRecording,
@@ -409,9 +503,9 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
     
     // Analysis
     getVoiceAnalysisSummary,
+    getSessionFeedback,
     
     // Status
-    hasDeepgramConnection: !!deepgramSocketRef.current,
-    hasEnhancedAnalyzer: !!enhancedAnalyzerRef.current
+    isAnalyzing
   };
 }

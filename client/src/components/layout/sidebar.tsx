@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
-  { name: "Practice Session", href: "/practice", icon: Video },
   { name: "AI Conversation", href: "/ai-conversation", icon: MessageCircle },
   { name: "Session History", href: "/history", icon: History },
   { name: "Settings", href: "/settings", icon: Settings },

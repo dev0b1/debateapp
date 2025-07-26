@@ -3,6 +3,7 @@ import mediapipe as mp
 import numpy as np
 import time
 import base64
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -207,7 +208,18 @@ def start_head_pose_server(host: str = "127.0.0.1", port: int = 5001):
 # Function to run the server in a separate process
 def run_head_pose_server():
     """Run the head pose detector server (for standalone use)"""
-    start_head_pose_server()
+    # Get host and port from environment variables (set by Node.js)
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "5001"))
+    start_head_pose_server(host, port)
 
 if __name__ == '__main__':
-    run_head_pose_server() 
+    import sys
+    
+    # Check if running in dev mode (like livekit agent)
+    if len(sys.argv) > 1 and sys.argv[1] == 'dev':
+        logger.info("Starting in development mode...")
+        run_head_pose_server()
+    else:
+        # Default behavior
+        run_head_pose_server() 

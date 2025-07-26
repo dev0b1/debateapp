@@ -13,7 +13,7 @@ import { Badge } from "../ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useToast } from "../../hooks/use-toast";
 import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
-import { useEyeTracking } from "../../hooks/use-eye-tracking";
+import { useFaceDetection } from "../../hooks/use-face-detection";
 import { MetricsPanel } from "../practice/metrics-panel";
 import { FaceTrackingDisplay } from "../conversation/face-tracking-display";
 import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
@@ -91,16 +91,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     stopCamera 
   } = useCamera();
 
-  const { 
-    eyeTrackingData,
-    confidence,
+    const {
+    faceDirection,
     currentMetrics,
     performanceStats,
-    isInitialized: isEyeTrackingInitialized
-  } = useEyeTracking(videoRef, isConnected, {
+    isInitialized: isFaceDetectionInitialized
+  } = useFaceDetection(videoRef, isConnected, {
     enableVisualization: true,
-    useSimpleDetector: true,
-    preferServerDetection: true
+
   });
 
   // Enhanced voice analyzer

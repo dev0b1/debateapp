@@ -1,20 +1,11 @@
 export interface FaceTrackingData {
-  eyeContact: {
+  faceDetected: boolean;
+  confidence: number;
+  direction: 'front' | 'left' | 'right' | 'up' | 'down' | 'unknown';
+  headPose: {
     x: number;
     y: number;
-    confidence: number;
-    timestamp: number;
+    z: number;
   };
-  headPose: {
-    pitch: number;
-    yaw: number;
-    roll: number;
-  };
-  eyeOpenness: {
-    left: number;
-    right: number;
-  };
-  blinkRate: number;
-  faceLandmarks: Array<{ x: number; y: number; z?: number }>;
-  faceDetected: boolean;
+  timestamp: number;
 } 
