@@ -57,7 +57,7 @@ export default function Dashboard() {
           <p className="text-gray-600 mt-1">Track your communication confidence progress</p>
         </div>
         <Button 
-          onClick={() => setLocation("/practice")}
+          onClick={() => setLocation("/ai-conversation")}
           className="bg-blue-600 hover:bg-blue-700"
         >
           <Play className="mr-2 h-4 w-4" />
@@ -137,20 +137,20 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
               className="flex items-center space-x-3 p-4 h-auto justify-start hover:border-blue-300 hover:bg-blue-50 border border-gray-200 bg-white"
-              onClick={() => setLocation("/practice")}
+              onClick={() => setLocation("/ai-conversation")}
             >
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Video className="h-5 w-5 text-blue-600" />
               </div>
               <div className="text-left">
-                <p className="font-medium text-gray-900">Free Practice</p>
-                <p className="text-sm text-gray-500">Start an unguided session</p>
+                <p className="font-medium text-gray-900">AI Interview Practice</p>
+                <p className="text-sm text-gray-500">Practice with AI conversation partner</p>
               </div>
             </Button>
 
             <Button
               className="flex items-center space-x-3 p-4 h-auto justify-start hover:border-green-300 hover:bg-green-50 border border-gray-200 bg-white"
-              onClick={() => setLocation("/practice")}
+              onClick={() => setLocation("/ai-conversation")}
             >
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                 <Play className="h-5 w-5 text-green-600" />

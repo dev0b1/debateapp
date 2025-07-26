@@ -314,7 +314,6 @@ export default function AIConversation() {
             <LiveKitRoom 
               roomData={roomData}
               onEnd={endConversation}
-              onQuestionChange={(question) => setCurrentQuestion(question)}
             />
           </div>
         </div>

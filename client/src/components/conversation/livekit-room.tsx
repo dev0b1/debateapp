@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useToast } from "../../hooks/use-toast";
 import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
 import { useFaceDetection } from "../../hooks/use-face-detection";
-import { MetricsPanel } from "../practice/metrics-panel";
 import { FaceTrackingDisplay } from "../conversation/face-tracking-display";
 import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
 import { useCamera } from "../../hooks/use-camera";
@@ -32,32 +31,19 @@ interface LiveKitRoomProps {
   onEnd: () => void;
 }
 
-function transformToFaceTrackingData(eyeTrackingData: any, currentMetrics: any): FaceTrackingData | null {
-  if (!eyeTrackingData || !currentMetrics) return null;
-  
-  // Use data from either server or simple detector
-  const metrics = eyeTrackingData.metrics;
-  const detectorType = eyeTrackingData.detectorType || 'simple';
+function transformToFaceTrackingData(faceDirection: any, currentMetrics: any): FaceTrackingData | null {
+  if (!faceDirection || !currentMetrics) return null;
   
   return {
-    eyeContact: {
-      x: metrics.eyeContact.x,
-      y: metrics.eyeContact.y,
-      confidence: metrics.eyeContact.confidence,
-      timestamp: Date.now()
-    },
+    faceDetected: faceDirection.faceDetected,
+    confidence: faceDirection.confidence,
+    direction: faceDirection.direction,
     headPose: {
-      pitch: metrics.headPose?.x || 0,
-      yaw: metrics.headPose?.y || 0,
-      roll: metrics.headPose?.z || 0
+      x: currentMetrics.headPose?.x || 0,
+      y: currentMetrics.headPose?.y || 0,
+      z: currentMetrics.headPose?.z || 0
     },
-    eyeOpenness: {
-      left: metrics.eyeAspectRatio.left,
-      right: metrics.eyeAspectRatio.right
-    },
-    blinkRate: metrics.blinkRate,
-    faceLandmarks: eyeTrackingData.landmarks || [],
-    faceDetected: eyeTrackingData.faceDetected
+    timestamp: Date.now()
   };
 }
 
@@ -106,19 +92,17 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     audioLevel: voiceAudioLevel,
     isRecording,
     voiceMetrics,
-    enhancedMetrics,
-    deepgramTranscription,
+    isSpeaking,
+    sessionRecording,
     isAnalyzing,
     startRecording,
     stopRecording,
     toggleMute,
     resetAnalysis,
     getVoiceAnalysisSummary,
-    hasDeepgramConnection,
-    hasEnhancedAnalyzer
+    getSessionFeedback
   } = useVoiceAnalyzer({
-    enableDeepgram: true,
-    deepgramApiKey: import.meta.env.VITE_DEEPGRAM_API_KEY
+    enableSessionRecording: true
   });
 
   useEffect(() => {
