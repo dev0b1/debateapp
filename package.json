@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "tsx server/index.ts",
+    "dev": "npx tsx server/index.ts",
     "dev:client": "vite --port 3000",
     "dev:full": "node start-dev.js",
     "start-dev": "node start-dev.js",

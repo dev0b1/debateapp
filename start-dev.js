@@ -5,17 +5,23 @@ const path = require('path');
 
 console.log('🚀 Starting Confidence Compass Development Environment...\n');
 
-// Start the main server
-const server = spawn('tsx', ['server/index.ts'], {
+// Check if tsx is available, otherwise use node with tsx
+let serverCommand = 'tsx';
+let serverArgs = ['server/index.ts'];
+
+// Try to use npx tsx if tsx is not available globally
+try {
+  require.resolve('tsx');
+} catch (e) {
+  console.log('📦 Using npx tsx...');
+  serverCommand = 'npx';
+  serverArgs = ['tsx', 'server/index.ts'];
+}
+
+// Start the main server (which now includes head pose detector management)
+const server = spawn(serverCommand, serverArgs, {
   stdio: 'inherit',
   shell: true
-});
-
-// Start the Python head pose detection server
-const pythonServer = spawn('python', ['server/head-pose-detector.py'], {
-  stdio: 'inherit',
-  shell: true,
-  cwd: process.cwd()
 });
 
 // Start the client
@@ -29,7 +35,6 @@ const client = spawn('vite', ['--port', '3000'], {
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down development environment...');
   server.kill();
-  pythonServer.kill();
   client.kill();
   process.exit();
 });
@@ -39,10 +44,6 @@ server.on('error', (err) => {
   console.error('❌ Server error:', err);
 });
 
-pythonServer.on('error', (err) => {
-  console.error('❌ Python server error:', err);
-});
-
 client.on('error', (err) => {
   console.error('❌ Client error:', err);
 });
@@ -50,5 +51,5 @@ client.on('error', (err) => {
 console.log('✅ All services started!');
 console.log('📱 Client: http://localhost:3000');
 console.log('🔧 Server: http://localhost:5000');
-console.log('🤖 Python Head Pose: http://localhost:5001');
+console.log('🤖 Head Pose Detector: Managed by Node.js server');
 console.log('\nPress Ctrl+C to stop all services\n'); 

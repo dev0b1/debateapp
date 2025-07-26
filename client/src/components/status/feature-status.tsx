@@ -143,12 +143,12 @@ export function FeatureStatus() {
         </div>
         
         <div className="pt-4 border-t">
-          <p className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600">
             Environment: <Badge className="bg-blue-100 text-blue-800">{status.environment}</Badge>
-          </p>
-          <p className="text-xs text-gray-500 mt-2">
+          </div>
+          <div className="text-xs text-gray-500 mt-2">
             Last checked: {new Date(status.timestamp).toLocaleTimeString()}
-          </p>
+          </div>
         </div>
       </CardContent>
     </Card>
