@@ -67,12 +67,28 @@ export default function AIConversation() {
 
   const createRoomMutation = useMutation({
     mutationFn: async (sessionData: InterviewSession) => {
-      // Simulate room creation with interview context
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return { 
-        roomId: `room-${sessionData.type}-${Date.now()}`, 
+      // Call the actual API to create a LiveKit room
+      const response = await fetch('/api/conversation/create-room', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topicId: sessionData.type,
+          context: sessionData.context
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create room');
+      }
+
+      const roomData = await response.json();
+      return {
+        ...roomData,
         sessionData,
-        currentQuestion: "Tell me about yourself and your background."
+        currentQuestion: roomData.topic?.firstQuestion || "Tell me about yourself and your background."
       };
     },
     onSuccess: (data) => {
