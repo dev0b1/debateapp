@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+git import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -149,52 +149,55 @@ export default function AIConversation() {
     };
   }
 
-  if (isInConversation && roomData) {
-    // Face analysis hooks
-    const {
-      videoRef,
-      isVideoEnabled,
-      startCamera,
-      stopCamera,
-      toggleVideo
-    } = useCamera();
+  // Face analysis hooks - always call these
+  const {
+    videoRef,
+    isVideoEnabled,
+    startCamera,
+    stopCamera,
+    toggleVideo
+  } = useCamera();
 
-    const {
-      faceDirection,
-      currentMetrics,
-      isInitialized,
-      performanceStats
-    } = useFaceDetection(videoRef, true, {
-      enableVisualization: true
-    });
+  const {
+    faceDirection,
+    currentMetrics,
+    isInitialized,
+    performanceStats
+  } = useFaceDetection(videoRef, isInConversation && roomData ? true : false, {
+    enableVisualization: true
+  });
 
-    // Voice analysis hook
-    const {
-      audioLevel,
-      isRecording,
-      voiceMetrics,
-      isAnalyzing,
-      isSpeaking,
-      sessionRecording: voiceSessionRecording,
-      startRecording,
-      stopRecording,
-      toggleMute,
-      resetAnalysis,
-      getVoiceAnalysisSummary,
-      getSessionFeedback
-    } = useVoiceAnalyzer({
-      enableSessionRecording: true
-    });
+  // Voice analysis hook - always call these
+  const {
+    audioLevel,
+    isRecording,
+    voiceMetrics,
+    isAnalyzing,
+    isSpeaking,
+    sessionRecording: voiceSessionRecording,
+    startRecording,
+    stopRecording,
+    toggleMute,
+    resetAnalysis,
+    getVoiceAnalysisSummary,
+    getSessionFeedback
+  } = useVoiceAnalyzer({
+    enableSessionRecording: true
+  });
 
-    // Start camera and voice recording on mount, stop on unmount
-    useEffect(() => {
+  // Start camera and voice recording when conversation starts
+  useEffect(() => {
+    if (isInConversation && roomData) {
       startCamera();
       startRecording();
       return () => {
         stopCamera();
         stopRecording();
       };
-    }, [startCamera, stopCamera, startRecording, stopRecording]);
+    }
+  }, [isInConversation, roomData, startCamera, stopCamera, startRecording, stopRecording]);
+
+  if (isInConversation && roomData) {
 
     const interviewTypeInfo = getInterviewTypeInfo(roomData.sessionData.type);
 
