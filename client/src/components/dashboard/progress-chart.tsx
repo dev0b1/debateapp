@@ -13,6 +13,39 @@ interface ChartDataPoint {
 export function ProgressChart() {
   const { data: sessions } = useQuery<Session[]>({
     queryKey: ["/api/sessions"],
+    queryFn: async () => {
+      // Mock data for now - replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return [
+        {
+          id: "1",
+          title: "Behavioral Interview Practice",
+          createdAt: new Date().toISOString(),
+          overallScore: 85,
+          duration: 1800,
+          eyeContactScore: 0.82,
+          voiceClarity: 0.78
+        },
+        {
+          id: "2", 
+          title: "Technical Interview Practice",
+          createdAt: new Date(Date.now() - 86400000).toISOString(),
+          overallScore: 72,
+          duration: 2400,
+          eyeContactScore: 0.75,
+          voiceClarity: 0.68
+        },
+        {
+          id: "3",
+          title: "General Interview Practice", 
+          createdAt: new Date(Date.now() - 172800000).toISOString(),
+          overallScore: 78,
+          duration: 1500,
+          eyeContactScore: 0.79,
+          voiceClarity: 0.76
+        }
+      ];
+    }
   });
 
   // Process sessions data for chart
