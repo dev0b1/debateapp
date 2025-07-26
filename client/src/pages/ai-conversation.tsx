@@ -9,28 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  Brain, 
-  Users, 
   MessageCircle, 
   Settings, 
   AlertTriangle, 
   Mic, 
-  Briefcase,
-  User,
   Target,
-  Sparkles,
-  Eye,
-  Video,
   TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useCamera } from "@/hooks/use-camera";
-import { useFaceDetection } from "@/hooks/use-face-detection";
 import { useVoiceAnalyzer } from "@/hooks/use-voice-analyzer";
-import { FaceTrackingDisplay } from "@/components/conversation/face-tracking-display";
 import { VoiceAnalysisDisplay } from "@/components/conversation/voice-analysis-display";
 import { SessionFeedback } from "@/components/conversation/session-feedback";
-import { FaceTrackingData } from "@/lib/face-tracking-types";
 import { LiveKitRoom } from "@/components/conversation/livekit-room";
 
 interface InterviewSession {
@@ -148,40 +137,7 @@ export default function AIConversation() {
     return interviewTypes.find(t => t.value === type);
   };
 
-  // Helper to transform face detection data
-  function transformToFaceTrackingData(faceDirection: any, currentMetrics: any): FaceTrackingData | null {
-    if (!faceDirection || !currentMetrics) return null;
-    
-    return {
-      faceDetected: faceDirection.faceDetected,
-      confidence: faceDirection.confidence,
-      direction: faceDirection.direction,
-      headPose: {
-        x: currentMetrics.headPose?.x || 0,
-        y: currentMetrics.headPose?.y || 0,
-        z: currentMetrics.headPose?.z || 0
-      },
-      timestamp: Date.now()
-    };
-  }
 
-  // Face analysis hooks - always call these
-  const {
-    videoRef,
-    isVideoEnabled,
-    startCamera,
-    stopCamera,
-    toggleVideo
-  } = useCamera();
-
-  const {
-    faceDirection,
-    currentMetrics,
-    isInitialized,
-    performanceStats
-  } = useFaceDetection(videoRef, isInConversation && roomData ? true : false, {
-    enableVisualization: true
-  });
 
   // Voice analysis hook - always call these
   const {
@@ -201,17 +157,15 @@ export default function AIConversation() {
     enableSessionRecording: true
   });
 
-  // Start camera and voice recording when conversation starts
+  // Start voice recording when conversation starts
   useEffect(() => {
     if (isInConversation && roomData) {
-      startCamera();
       startRecording();
       return () => {
-        stopCamera();
         stopRecording();
       };
     }
-  }, [isInConversation, roomData, startCamera, stopCamera, startRecording, stopRecording]);
+  }, [isInConversation, roomData, startRecording, stopRecording]);
 
   if (isInConversation && roomData) {
 
@@ -265,48 +219,7 @@ export default function AIConversation() {
         )}
 
         {/* Conversation Interface */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Face Detection */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="w-5 h-5" />
-                  Face Detection
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Face tracking overlay */}
-                  <FaceTrackingDisplay
-                    faceTrackingData={transformToFaceTrackingData(faceDirection, currentMetrics)}
-                    confidence={faceDirection.confidence}
-                    isActive={true}
-                    videoRef={videoRef}
-                    performanceStats={performanceStats}
-                  />
-                </div>
-                <div className="flex items-center justify-center space-x-4 mt-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleVideo}
-                    className="w-12 h-12 rounded-full"
-                  >
-                    <Video className={`h-5 w-5 ${isVideoEnabled ? 'text-gray-600' : 'text-red-600'}`} />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Voice Analysis */}
           <div>
             <Card>
@@ -350,12 +263,8 @@ export default function AIConversation() {
               <CardContent>
                 <SessionFeedback
                   sessionData={sessionRecording}
-                  videoRef={videoRef}
                   onTimestampClick={(timestamp) => {
-                    if (videoRef?.current) {
-                      videoRef.current.currentTime = timestamp / 1000;
-                      videoRef.current.play();
-                    }
+                    // Video playback functionality removed - face detection is no longer used
                   }}
                 />
               </CardContent>

@@ -50,8 +50,7 @@ router.post("/api/conversation/create-room", async (req, res) => {
       });
     }
 
-    // Note: Head pose detection is now handled client-side
-    // The Python backend head pose detector is no longer needed for AI conversations
+
 
     const topic = getTopicById(topicId);
     console.log("Found topic:", topic ? topic.title : "Not found");
