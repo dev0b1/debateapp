@@ -13,13 +13,8 @@ import { Badge } from "../ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useToast } from "../../hooks/use-toast";
 import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
-import { useFaceDetection } from "../../hooks/use-face-detection";
-import { FaceTrackingDisplay } from "../conversation/face-tracking-display";
 import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
-import { useCamera } from "../../hooks/use-camera";
-// Removed MediaPipe import - using simple detector instead
-import { FaceTrackingData } from "@/lib/face-tracking-types";
-import { Play, Square, Video, Mic, MicOff, Eye, Brain, Settings } from "lucide-react";
+import { Play, Square, Mic, MicOff, Brain, Settings } from "lucide-react";
 
 interface LiveKitRoomProps {
   roomData: {
@@ -31,21 +26,7 @@ interface LiveKitRoomProps {
   onEnd: () => void;
 }
 
-function transformToFaceTrackingData(faceDirection: any, currentMetrics: any): FaceTrackingData | null {
-  if (!faceDirection || !currentMetrics) return null;
-  
-  return {
-    faceDetected: faceDirection.faceDetected,
-    confidence: faceDirection.confidence,
-    direction: faceDirection.direction,
-    headPose: {
-      x: currentMetrics.headPose?.x || 0,
-      y: currentMetrics.headPose?.y || 0,
-      z: currentMetrics.headPose?.z || 0
-    },
-    timestamp: Date.now()
-  };
-}
+
 
 export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const [room] = useState(() => new Room({
@@ -66,26 +47,6 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const timerRef = useRef<NodeJS.Timeout>();
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
   const { toast } = useToast();
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Enhanced camera and tracking hooks
-  const { 
-    stream: cameraStream, 
-    isVideoEnabled, 
-    toggleVideo, 
-    startCamera, 
-    stopCamera 
-  } = useCamera();
-
-    const {
-    faceDirection,
-    currentMetrics,
-    performanceStats,
-    isInitialized: isFaceDetectionInitialized
-  } = useFaceDetection(videoRef, isConnected, {
-    enableVisualization: true,
-
-  });
 
   // Enhanced voice analyzer
   const {
@@ -115,8 +76,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           await room.connect(roomData.serverUrl, roomData.token);
           console.log("Connected to LiveKit room successfully");
 
-          // Start camera and voice analysis
-          await startCamera();
+          // Start voice analysis
           await startRecording();
 
           try {
@@ -232,11 +192,10 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      stopCamera();
       stopRecording();
       room.disconnect();
     };
-  }, [room, roomData.serverUrl, roomData.token, toast, startCamera, stopCamera, startRecording, stopRecording]);
+  }, [room, roomData.serverUrl, roomData.token, toast, startRecording, stopRecording]);
 
   const toggleMic = () => {
     const track = audioTrackRef.current;
@@ -323,127 +282,30 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Video Feed and Controls */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Enhanced Camera Feed with MediaPipe Overlay */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Voice Analysis */}
+          <div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Video className="w-5 h-5" />
-                  Video Feed & Face Tracking
+                  <Mic className="w-5 h-5" />
+                  Voice Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Face tracking overlay canvas */}
-                  <canvas
-                    id="face-tracking-canvas"
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
-                    style={{ 
-                      maxWidth: '100%',
-                      height: 'auto',
-                      aspectRatio: '4/3'
-                    }}
-                  />
-                </div>
-                
-                {/* Camera Controls */}
-                <div className="flex items-center justify-center space-x-4 mt-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleVideo}
-                    className="w-12 h-12 rounded-full"
-                  >
-                    <Video className={`h-5 w-5 ${isVideoEnabled ? 'text-gray-600' : 'text-red-600'}`} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleMic}
-                    className="w-12 h-12 rounded-full"
-                  >
-                    {isRecording ? (
-                      <Mic className="h-5 w-5 text-gray-600" />
-                    ) : (
-                      <MicOff className="h-5 w-5 text-red-600" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetAnalysis}
-                    className="flex items-center gap-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Reset Analysis
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Enhanced Analysis Tabs */}
-            <Tabs defaultValue="face-tracking" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="face-tracking" className="flex items-center gap-2">
-                  <Eye className="w-4 h-4" />
-                  Face Tracking
-                </TabsTrigger>
-                <TabsTrigger value="voice-analysis" className="flex items-center gap-2">
-                  <Mic className="w-4 h-4" />
-                  Voice Analysis
-                </TabsTrigger>
-                <TabsTrigger value="basic-metrics" className="flex items-center gap-2">
-                  <Brain className="w-4 h-4" />
-                  Basic Metrics
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="face-tracking" className="mt-4">
-                <FaceTrackingDisplay
-                  faceTrackingData={transformToFaceTrackingData(eyeTrackingData, currentMetrics)}
-                  confidence={confidence}
-                  isActive={isConnected}
-                  videoRef={videoRef}
-                  performanceStats={performanceStats}
-                />
-              </TabsContent>
-              
-              <TabsContent value="voice-analysis" className="mt-4">
                 <VoiceAnalysisDisplay
                   voiceMetrics={voiceMetrics}
-                  advancedMetrics={enhancedMetrics}
-                  deepgramTranscription={deepgramTranscription}
                   audioLevel={voiceAudioLevel}
                   isAnalyzing={isAnalyzing}
                   isRecording={isRecording}
-                  hasDeepgramConnection={hasDeepgramConnection}
-                  hasAdvancedAnalyzer={hasEnhancedAnalyzer}
+                  isSpeaking={isSpeaking}
                 />
-              </TabsContent>
-              
-              <TabsContent value="basic-metrics" className="mt-4">
-                <MetricsPanel
-                  voiceMetrics={voiceMetrics}
-                  eyeContactScore={confidence * 100}
-                  sessionTimer={formatTime(sessionTimer)}
-                  overallScore={Math.round((confidence * 100 + voiceAudioLevel) / 2)}
-                  isActive={isConnected}
-                />
-              </TabsContent>
-            </Tabs>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Real-time Summary Panel */}
-          <div className="space-y-6">
+          {/* Conversation Summary */}
+          <div>
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Conversation Summary</CardTitle>
@@ -456,96 +318,17 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                   </div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Eye Contact</span>
-                    <Badge variant={confidence > 0.7 ? "default" : confidence > 0.5 ? "secondary" : "destructive"}>
-                      {Math.round(confidence * 100)}%
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Audio Level</span>
                     <Badge variant={voiceAudioLevel > 20 ? "default" : "secondary"}>
                       {Math.round(voiceAudioLevel)}%
                     </Badge>
                   </div>
-
-                  {currentMetrics && (
-                    <>
-                                              <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Head Position</span>
-                          <Badge variant="outline">
-                            {Math.abs(currentMetrics.headPose?.y || 0) < 15 ? "Centered" : "Off-center"}
-                          </Badge>
-                        </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Blink Rate</span>
-                        <Badge variant="outline">
-                          {Math.round(currentMetrics.blinkRate)}/min
-                        </Badge>
-                      </div>
-                    </>
-                  )}
-
-                  {enhancedMetrics && (
-                    <>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Voice Clarity</span>
-                        <Badge variant={enhancedMetrics.clarity > 75 ? "default" : "secondary"}>
-                          {Math.round(enhancedMetrics.clarity)}%
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Emotion</span>
-                        <Badge variant="outline" className="capitalize">
-                          {enhancedMetrics.emotion.type}
-                        </Badge>
-                      </div>
-                      
-                      {enhancedMetrics.fillerWords.words.length > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Filler Words</span>
-                          <Badge variant="destructive">
-                            {enhancedMetrics.fillerWords.words.length}
-                          </Badge>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {deepgramTranscription && (
-                  <div className="pt-4 border-t">
-                    <h4 className="text-sm font-medium mb-2">Recent Speech</h4>
-                    <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded max-h-20 overflow-y-auto">
-                      {deepgramTranscription.length > 200 
-                        ? `${deepgramTranscription.slice(-200)}...`
-                        : deepgramTranscription}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Conversation Tips */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Conversation Tips</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-sm text-muted-foreground space-y-2">
-                  <p>• Maintain eye contact with the camera</p>
-                  <p>• Speak clearly and at a moderate pace</p>
-                  <p>• Listen actively and respond naturally</p>
-                  <p>• Avoid filler words like "um" and "uh"</p>
-                  <p>• Keep your head centered and steady</p>
                 </div>
               </CardContent>
             </Card>
 
             {/* End Session Button */}
-            <Card>
+            <Card className="mt-6">
               <CardContent className="pt-6">
                 <Button 
                   onClick={onEnd}
