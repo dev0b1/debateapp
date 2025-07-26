@@ -143,7 +143,7 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
 
       // Connect the audio track to the analyzer
       const source = audioContextRef.current.createMediaStreamSource(mediaStream);
-      source.connect(analyserRef.current);
+        source.connect(analyserRef.current);
 
       // Start analysis
       analyzeAudio();
@@ -326,27 +326,27 @@ export function useVoiceAnalyzer(options: VoiceAnalyzerOptions = {}) {
         await connectToLivekitAudio();
       } else {
         // Fallback to getting microphone access directly
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          } 
-        });
-        
-        streamRef.current = stream;
-        
-        // Initialize audio context and analyzer
-        audioContextRef.current = new AudioContext();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 2048;
-        
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        source.connect(analyserRef.current);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      streamRef.current = stream;
+      
+      // Initialize audio context and analyzer
+      audioContextRef.current = new AudioContext();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 2048;
+      
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
       }
       
       setIsRecording(true);
-      analyzeAudio();
+        analyzeAudio();
 
     } catch (error) {
       console.error('Failed to start recording:', error);
