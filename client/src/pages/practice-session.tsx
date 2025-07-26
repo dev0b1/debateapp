@@ -439,7 +439,7 @@ export default function PracticeSession() {
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-muted-foreground">Head Position</span>
                           <Badge variant="outline">
-                            {Math.abs(currentMetrics.gazeDirection.x) < 0.15 ? "Centered" : "Off-center"}
+                            {Math.abs(currentMetrics.headPose?.y || 0) < 15 ? "Centered" : "Off-center"}
                           </Badge>
                         </div>
                         

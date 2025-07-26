@@ -489,12 +489,12 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
                   {currentMetrics && (
                     <>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Head Position</span>
-                        <Badge variant="outline">
-                          {Math.abs(currentMetrics.gazeDirection.x) < 0.15 ? "Centered" : "Off-center"}
-                        </Badge>
-                      </div>
+                                              <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Head Position</span>
+                          <Badge variant="outline">
+                            {Math.abs(currentMetrics.headPose?.y || 0) < 15 ? "Centered" : "Off-center"}
+                          </Badge>
+                        </div>
                       
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Blink Rate</span>
