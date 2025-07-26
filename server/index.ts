@@ -3,7 +3,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import router from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { createServer } from "http";
-import { headPoseManager } from "./head-pose-manager";
 
 // Set NODE_ENV if not already set
 if (!process.env.NODE_ENV) {
@@ -106,13 +105,11 @@ app.use((req, res, next) => {
   // Graceful shutdown
   process.on('SIGINT', async () => {
     log('🛑 Shutting down server...');
-    await headPoseManager.stop();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
     log('🛑 Shutting down server...');
-    await headPoseManager.stop();
     process.exit(0);
   });
 })();
