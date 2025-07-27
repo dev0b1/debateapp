@@ -10,11 +10,11 @@ import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useToast } from "../../hooks/use-toast";
-import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
-import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
-import { Play, Square, Mic, MicOff, Settings } from "lucide-react";
+// import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
+// import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
+import { Square, Mic, MicOff } from "lucide-react";
 
 interface LiveKitRoomProps {
   roomData: {
@@ -469,7 +469,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       }
       setIsMicMuted(!isMicMuted);
     }
-    toggleMute();
+    // toggleMute(); // COMMENTED OUT FOR DEBUGGING
   };
 
   const formatTime = (seconds: number): string => {
