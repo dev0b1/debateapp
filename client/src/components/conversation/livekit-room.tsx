@@ -54,6 +54,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const timerRef = useRef<NodeJS.Timeout>();
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
   const hasConnectedRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const { toast } = useToast();
 
   // Enhanced voice analyzer
@@ -74,19 +75,26 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     enableSessionRecording: true
   });
 
-  useEffect(() => {
+    useEffect(() => {
     let mounted = true;
     let isConnecting = false; // Prevent multiple simultaneous connections
 
-        const connect = async () => {
+    // Don't connect if already connected
+    if (isConnected || hasConnectedRef.current) {
+      console.log("🔄 Skipping useEffect - already connected");
+      return;
+    }
+
+    const connect = async () => {
       if (isConnecting) {
         console.log("🔄 Already connecting, skipping...");
         return;
       }
       
-      // Check if already connected
-      if (room.connectionState === ConnectionState.Connected) {
-        console.log("✅ Already connected to room, skipping connection...");
+      // Check if already connected or connecting
+      if (room.connectionState === ConnectionState.Connected || 
+          room.connectionState === ConnectionState.Connecting) {
+        console.log(`✅ Room is ${room.connectionState}, skipping connection...`);
         return;
       }
       
@@ -96,6 +104,13 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         return;
       }
       
+      // Check if we're already connected via state
+      if (isConnected) {
+        console.log("✅ Already connected via state, skipping connection...");
+        return;
+      }
+      
+      console.log("🚀 Starting fresh connection...");
       isConnecting = true;
       
       try {
@@ -123,9 +138,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             return;
           }
 
-          // Connect to LiveKit room
+          // Connect to LiveKit room with timeout
           console.log("Connecting to LiveKit room...");
-          await room.connect(roomData.serverUrl, roomData.token);
+          const connectPromise = room.connect(roomData.serverUrl, roomData.token);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Connection timeout')), 30000)
+          );
+          
+          await Promise.race([connectPromise, timeoutPromise]);
           console.log("✅ Connected to LiveKit room successfully");
           console.log("Connection state:", room.connectionState);
           console.log("Room name:", room.name);
@@ -133,13 +153,23 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
           // Now publish the audio track
           try {
+            if (audioTrackRef.current) {
+              console.log("🔄 Audio track already exists, stopping old one...");
+              audioTrackRef.current.stop();
+              audioTrackRef.current = null;
+            }
+            
             const audioTrack = new LocalAudioTrack(micStream.getAudioTracks()[0]);
             await room.localParticipant.publishTrack(audioTrack);
             audioTrackRef.current = audioTrack;
-            console.log("Published local audio track");
+            console.log("✅ Published local audio track");
 
             // Set up audio level monitoring using the same stream
-            const audioContext = new AudioContext();
+            if (!audioContextRef.current) {
+              audioContextRef.current = new AudioContext();
+              console.log("🎤 Audio context created for level monitoring");
+            }
+            const audioContext = audioContextRef.current;
             const source = audioContext.createMediaStreamSource(micStream);
             const analyser = audioContext.createAnalyser();
             source.connect(analyser);
@@ -333,12 +363,16 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         audioTrackRef.current.stop();
         audioTrackRef.current = null;
       }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
       stopRecording();
       if (room.connectionState !== ConnectionState.Disconnected) {
         room.disconnect();
       }
     };
-  }, [room, roomData.serverUrl, roomData.token, toast, startRecording, stopRecording]);
+  }, [room, roomData.serverUrl, roomData.token]);
 
   const toggleMic = () => {
     const track = audioTrackRef.current;
