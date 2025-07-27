@@ -37,7 +37,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       noiseSuppression: true,
       autoGainControl: true,
     },
-    stopLocalTrackOnUnpublish: true
+    stopLocalTrackOnUnpublish: true,
+    // Add debugging options
+    publishDefaults: {
+      simulcast: false,
+      videoSimulcastLayers: [],
+      audioPreset: 'music',
+      videoPreset: 'none'
+    }
   }));
   const [error, setError] = useState<string | null>(null);
   const [sessionTimer, setSessionTimer] = useState(0);
@@ -73,19 +80,63 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       try {
         if (mounted) {
           console.log("Connecting to LiveKit room:", roomData);
+          
+          // First, get microphone permission and create audio track
+          let micStream: MediaStream | null = null;
+          try {
+            micStream = await navigator.mediaDevices.getUserMedia({ 
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              } 
+            });
+            console.log("Microphone access granted");
+          } catch (micErr) {
+            console.error("Mic permission denied or capture failed:", micErr);
+            toast({
+              title: "Microphone Access Denied",
+              description: "Please allow microphone access to begin the session.",
+              variant: "destructive"
+            });
+            return;
+          }
+
+          // Connect to LiveKit room
           await room.connect(roomData.serverUrl, roomData.token);
           console.log("Connected to LiveKit room successfully");
 
-          // Start voice analysis
-          await startRecording();
+          // Wait for connection to be fully established
+          if (room.connectionState !== ConnectionState.Connected) {
+            console.log("Waiting for connection to be established...");
+            await new Promise<void>((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error("Connection timeout"));
+              }, 10000);
 
+              const checkConnection = () => {
+                if (room.connectionState === ConnectionState.Connected) {
+                  clearTimeout(timeout);
+                  resolve();
+                } else if (room.connectionState === ConnectionState.Disconnected) {
+                  clearTimeout(timeout);
+                  reject(new Error("Connection failed"));
+                } else {
+                  setTimeout(checkConnection, 100);
+                }
+              };
+              checkConnection();
+            });
+          }
+
+          // Now publish the audio track
           try {
-            const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const audioTrack = new LocalAudioTrack(micStream.getAudioTracks()[0]);
             await room.localParticipant.publishTrack(audioTrack);
             audioTrackRef.current = audioTrack;
             console.log("Published local audio track");
 
+            // Set up audio level monitoring using the same stream
             const audioContext = new AudioContext();
             const source = audioContext.createMediaStreamSource(micStream);
             const analyser = audioContext.createAnalyser();
@@ -94,25 +145,30 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
             const updateAudioLevel = () => {
-              analyser.getByteFrequencyData(dataArray);
-              let sum = 0;
-              for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
+              if (mounted) {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                  sum += dataArray[i];
+                }
+                const average = sum / dataArray.length;
+                setAudioLevel(Math.round(average));
+                requestAnimationFrame(updateAudioLevel);
               }
-              const average = sum / dataArray.length;
-              setAudioLevel(Math.round(average));
-              requestAnimationFrame(updateAudioLevel);
             };
             updateAudioLevel();
-          } catch (micErr) {
-            console.error("Mic permission denied or capture failed:", micErr);
+          } catch (publishErr) {
+            console.error("Error publishing audio track:", publishErr);
             toast({
-              title: "Microphone Access Denied",
-              description: "Please allow microphone access to begin the session.",
+              title: "Audio Track Error",
+              description: "Failed to publish audio track. Please try again.",
               variant: "destructive"
             });
+            return;
           }
 
+          // Start voice analysis after successful connection
+          await startRecording();
           setIsConnected(true);
 
           room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
@@ -147,12 +203,18 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
           room.on(RoomEvent.ConnectionStateChanged, (state) => {
             console.log("Connection state changed:", state);
+            console.log("Room URL:", roomData.serverUrl);
+            console.log("Room name:", room.name);
+            console.log("Local participant:", room.localParticipant?.identity);
+            
             switch (state) {
               case ConnectionState.Connecting:
                 toast({ title: "Connecting", description: "Establishing connection to the room..." });
                 break;
               case ConnectionState.Connected:
                 toast({ title: "Connected", description: "Successfully connected to conversation room." });
+                console.log("✅ Room connected successfully");
+                console.log("Participants:", room.participants.size);
                 break;
               case ConnectionState.Disconnected:
                 toast({
@@ -160,6 +222,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                   description: "Lost connection to the room. Attempting to reconnect...",
                   variant: "destructive"
                 });
+                console.log("❌ Room disconnected");
                 break;
               case ConnectionState.Reconnecting:
                 toast({
@@ -167,6 +230,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                   description: "Attempting to reconnect to the room...",
                   variant: "destructive"
                 });
+                console.log("🔄 Room reconnecting");
                 break;
             }
           });
@@ -183,6 +247,15 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           description: "Failed to connect to conversation room. Please try again.",
           variant: "destructive"
         });
+        
+        // Clean up on connection failure
+        if (audioTrackRef.current) {
+          audioTrackRef.current.stop();
+          audioTrackRef.current = null;
+        }
+        if (room.connectionState !== ConnectionState.Disconnected) {
+          room.disconnect();
+        }
       }
     };
     connect();
@@ -192,8 +265,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (audioTrackRef.current) {
+        audioTrackRef.current.stop();
+        audioTrackRef.current = null;
+      }
       stopRecording();
-      room.disconnect();
+      if (room.connectionState !== ConnectionState.Disconnected) {
+        room.disconnect();
+      }
     };
   }, [room, roomData.serverUrl, roomData.token, toast, startRecording, stopRecording]);
 
