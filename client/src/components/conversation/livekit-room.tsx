@@ -53,6 +53,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const [audioLevel, setAudioLevel] = useState(0);
   const timerRef = useRef<NodeJS.Timeout>();
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
+  const hasConnectedRef = useRef(false);
   const { toast } = useToast();
 
   // Enhanced voice analyzer
@@ -75,8 +76,28 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
   useEffect(() => {
     let mounted = true;
+    let isConnecting = false; // Prevent multiple simultaneous connections
 
-    const connect = async () => {
+        const connect = async () => {
+      if (isConnecting) {
+        console.log("🔄 Already connecting, skipping...");
+        return;
+      }
+      
+      // Check if already connected
+      if (room.connectionState === ConnectionState.Connected) {
+        console.log("✅ Already connected to room, skipping connection...");
+        return;
+      }
+      
+      // Check if we've already connected once
+      if (hasConnectedRef.current) {
+        console.log("✅ Already connected once, skipping reconnection...");
+        return;
+      }
+      
+      isConnecting = true;
+      
       try {
         if (mounted) {
           console.log("Connecting to LiveKit room:", roomData);
@@ -151,6 +172,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           // Start voice analysis after successful connection
           await startRecording();
           setIsConnected(true);
+          hasConnectedRef.current = true; // Mark as connected
           
           // Wait for room to be ready and check for AI agent
           console.log("Waiting for room to be ready...");
@@ -294,12 +316,16 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         if (room.connectionState !== ConnectionState.Disconnected) {
           room.disconnect();
         }
+      } finally {
+        isConnecting = false; // Always reset connection flag
       }
     };
     connect();
 
     return () => {
       mounted = false;
+      isConnecting = false; // Reset connection flag
+      hasConnectedRef.current = false; // Reset connection ref
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
