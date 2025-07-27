@@ -13,7 +13,6 @@ from livekit.plugins import (
     silero,
     noise_cancellation,
 )
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 load_dotenv()          # pulls environment variables from .env
 
