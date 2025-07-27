@@ -1,3 +1,5 @@
 livekit-agents[deepgram,openai,cartesia,silero,turn-detector,noise-cancellation]>=1.0
 livekit-plugins-noise-cancellation>=0.2
-python-dotenv 
+python-dotenv
+torch>=2.0
+transformers>=4.0
