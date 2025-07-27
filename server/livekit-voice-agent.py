@@ -60,9 +60,6 @@ async def entrypoint(ctx: agents.JobContext):
         tts=cartesia.TTS(
             model="sonic-2",
             voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",
-            # Optimize for lower latency
-            sample_rate=16000,  # Lower sample rate for voice
-            speed=1.0,          # Normal speed
         ),
         vad=silero.VAD.load(),
         #turn_detection=MultilingualModel(),
@@ -105,7 +102,19 @@ async def entrypoint(ctx: agents.JobContext):
         )
         
         print("✅ Welcome message generated and sent successfully!")
-        print(f"📝 Generated text: {response}")
+        print(f"📝 Generated response object: {response}")
+        
+        # Extract the actual text from the response
+        if hasattr(response, 'text'):
+            print(f"📄 Actual LLM text: {response.text}")
+        elif hasattr(response, 'message'):
+            print(f"📄 Actual LLM text: {response.message}")
+        elif hasattr(response, 'content'):
+            print(f"📄 Actual LLM text: {response.content}")
+        else:
+            print(f"📄 Response type: {type(response)}")
+            print(f"📄 Response attributes: {dir(response)}")
+        
         print("🔊 Audio should now be playing in the room...")
         
         # Check if we're actually connected to the room

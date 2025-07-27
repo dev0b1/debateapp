@@ -38,11 +38,11 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       autoGainControl: true,
     },
     stopLocalTrackOnUnpublish: true,
-    // Optimized for voice conversation (lower latency)
+    // Audio settings for good quality
     publishDefaults: {
       simulcast: false,
       videoSimulcastLayers: [],
-      audioPreset: 'voice', // Changed from 'music' to 'voice' for lower latency
+      audioPreset: 'music', // Back to music for better quality
       videoPreset: 'none'
     }
   }));
@@ -88,11 +88,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
               audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true,
-                // Optimize for voice conversation
-                sampleRate: 16000, // Lower sample rate for voice
-                channelCount: 1,    // Mono for voice
-                latency: 0.01       // Lower latency
+                autoGainControl: true
               } 
             });
             console.log("Microphone access granted");
@@ -194,6 +190,19 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                   title: "AI Agent Connected",
                   description: "The AI interviewer has joined. You should hear a welcome message shortly.",
                 });
+                
+                // Monitor audio quality
+                track.on(TrackEvent.AudioLevelChanged, (level) => {
+                  console.log("🔊 AI agent audio level:", level);
+                });
+                
+                track.on(TrackEvent.Muted, () => {
+                  console.log("🔇 AI agent audio muted");
+                });
+                
+                track.on(TrackEvent.Unmuted, () => {
+                  console.log("🔊 AI agent audio unmuted");
+                });
               }
               
               track.on(TrackEvent.Muted, () => {
@@ -227,6 +236,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             console.log("Room URL:", roomData.serverUrl);
             console.log("Room name:", room.name);
             console.log("Local participant:", room.localParticipant?.identity);
+            
+            // Log connection quality
+            if (state === ConnectionState.Connected) {
+              console.log("📊 Connection quality info:");
+              console.log("   - Room URL:", roomData.serverUrl);
+              console.log("   - Connection state:", room.connectionState);
+              console.log("   - Participants:", room.participants?.size || 0);
+            }
             
             switch (state) {
               case ConnectionState.Connecting:
