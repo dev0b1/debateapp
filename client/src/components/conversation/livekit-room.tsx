@@ -229,8 +229,10 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                 participantsCount: room.participants?.size || 'undefined'
               });
               
-              if (isConnected && hasLocalParticipant) {
-                console.log("✅ Room is ready (connected with local participant)");
+              // If we have a local participant, consider the room ready
+              // (connectionState might be undefined due to LiveKit bug)
+              if (hasLocalParticipant) {
+                console.log("✅ Room is ready (has local participant)");
                 resolve();
               } else if (attempts >= maxAttempts) {
                 console.log("⚠️ Room ready timeout, proceeding anyway...");
@@ -283,6 +285,13 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             console.log("Track subscribed:", track.kind, "from", participant.identity);
             if (track.kind === Track.Kind.Audio) {
               console.log("Audio track subscribed from:", participant.identity);
+              console.log("🔍 Track Details:", {
+                kind: track.kind,
+                source: track.source,
+                sid: track.sid,
+                isMuted: track.isMuted,
+                isEnabled: track.isEnabled
+              });
               
               // Check if this is the AI agent speaking
               if (participant.identity === 'ai-agent') {
