@@ -86,13 +86,24 @@ async def entrypoint(ctx: agents.JobContext):
     context_mention = f" (context: {context})" if context else ""
     print(f"🎤 Generating welcome message for {topic} session{context_mention}...")
     
+    # Check if Cartesia API key is available
+    cartesia_key = os.getenv("CARTESIA_API_KEY")
+    if not cartesia_key:
+        print("⚠️ WARNING: CARTESIA_API_KEY not found! TTS will not work.")
+    else:
+        print("✅ Cartesia API key found")
+    
     try:
+        print("🔄 Calling session.generate_reply()...")
         await session.generate_reply(
             instructions=f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
         )
         print("✅ Welcome message generated and sent successfully!")
+        print("🔊 Audio should now be playing in the room...")
     except Exception as e:
         print(f"❌ Error generating welcome message: {e}")
+        print(f"❌ Error type: {type(e).__name__}")
+        print(f"❌ Error details: {str(e)}")
         raise e
     
     print("🎉 Voice agent is fully ready and waiting for user!")

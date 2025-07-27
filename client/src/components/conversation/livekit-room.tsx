@@ -152,9 +152,23 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           await startRecording();
           setIsConnected(true);
           
-          // Check for AI agent (simplified)
+          // Wait for room to be ready and check for AI agent
+          console.log("Waiting for room to be ready...");
+          await new Promise<void>((resolve) => {
+            const checkRoomReady = () => {
+              if (room.participants !== undefined) {
+                console.log("✅ Room is ready");
+                resolve();
+              } else {
+                console.log("⏳ Room not ready yet, waiting...");
+                setTimeout(checkRoomReady, 100);
+              }
+            };
+            checkRoomReady();
+          });
+          
           console.log("Checking for AI agent...");
-          const participants = Array.from(room.participants.values());
+          const participants = Array.from(room.participants!.values());
           console.log("Current participants:", participants.map(p => p.identity));
           
           const aiAgent = participants.find(p => p.identity === 'ai-agent');
