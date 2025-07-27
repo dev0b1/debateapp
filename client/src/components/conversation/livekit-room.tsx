@@ -61,23 +61,23 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const { toast } = useToast();
 
-  // Enhanced voice analyzer
-  const {
-    audioLevel: voiceAudioLevel,
-    isRecording,
-    voiceMetrics,
-    isSpeaking,
-    sessionRecording,
-    isAnalyzing,
-    startRecording,
-    stopRecording,
-    toggleMute,
-    resetAnalysis,
-    getVoiceAnalysisSummary,
-    getSessionFeedback
-  } = useVoiceAnalyzer({
-    enableSessionRecording: true
-  });
+  // Enhanced voice analyzer - COMMENTED OUT FOR DEBUGGING
+  // const {
+  //   audioLevel: voiceAudioLevel,
+  //   isRecording,
+  //   voiceMetrics,
+  //   isSpeaking,
+  //   sessionRecording,
+  //   isAnalyzing,
+  //   startRecording,
+  //   stopRecording,
+  //   toggleMute,
+  //   resetAnalysis,
+  //   getVoiceAnalysisSummary,
+  //   getSessionFeedback
+  // } = useVoiceAnalyzer({
+  //   enableSessionRecording: true
+  // });
 
     useEffect(() => {
     let mounted = true;
@@ -203,8 +203,8 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             return;
           }
 
-          // Start voice analysis after successful connection
-          await startRecording();
+          // Start voice analysis after successful connection - COMMENTED OUT FOR DEBUGGING
+          // await startRecording();
           setIsConnected(true);
           hasConnectedRef.current = true; // Mark as connected
           
@@ -282,15 +282,18 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           });
 
           room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-            console.log("Track subscribed:", track.kind, "from", participant.identity);
+            console.log("🎵 Track subscribed:", track.kind, "from", participant.identity);
             if (track.kind === Track.Kind.Audio) {
-              console.log("Audio track subscribed from:", participant.identity);
+              console.log("🔊 Audio track subscribed from:", participant.identity);
               console.log("🔍 Track Details:", {
                 kind: track.kind,
                 source: track.source,
                 sid: track.sid,
                 isMuted: track.isMuted,
-                isEnabled: track.isEnabled
+                isEnabled: track.isEnabled,
+                participantIdentity: participant.identity,
+                participantSid: participant.sid,
+                isLocal: participant.isLocal
               });
               
               // Check if this is the AI agent speaking
@@ -346,9 +349,16 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           });
 
           room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-            console.log("Track unsubscribed:", track.kind, "from", participant.identity);
+            console.log("🎵 Track unsubscribed:", track.kind, "from", participant.identity);
             if (track.kind === Track.Kind.Audio) {
-              console.log("Audio track unsubscribed");
+              console.log("🔊 Audio track unsubscribed from:", participant.identity);
+              console.log("🔍 Unsubscribed Track Details:", {
+                kind: track.kind,
+                source: track.source,
+                sid: track.sid,
+                participantIdentity: participant.identity,
+                participantSid: participant.sid
+              });
               toast({
                 title: "Audio Disconnected",
                 description: "The audio connection has been lost. Attempting to reconnect...",
@@ -442,7 +452,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         audioContextRef.current.close();
         audioContextRef.current = null;
       }
-      stopRecording();
+      // stopRecording(); // COMMENTED OUT FOR DEBUGGING
       if (room.connectionState !== ConnectionState.Disconnected) {
         room.disconnect();
       }
@@ -494,94 +504,75 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   return (
     <RoomContext.Provider value={room}>
       <div className="h-full space-y-6">
-        {/* Session Status */}
+        {/* MINIMAL DEBUG UI */}
         <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                  <span className="font-medium">AI Conversation Active</span>
+                  <span className="font-medium">LiveKit Debug Mode</span>
                 </div>
                 <Badge variant="outline">{formatTime(sessionTimer)}</Badge>
-                {roomData.topic && (
-                  <Badge variant="outline" className="capitalize">
-                    {roomData.topic.difficulty} - {roomData.topic.title}
-                  </Badge>
-                )}
+                <Badge variant="outline">
+                  Connection: {room.connectionState || 'undefined'}
+                </Badge>
               </div>
               <div className="flex items-center gap-4">
-                <Badge variant="default" className="bg-green-600">
+                <Badge variant={isMicMuted ? "secondary" : "default"}>
                   <Mic className="w-3 h-3 mr-1" />
-                  Voice Active
+                  {isMicMuted ? "Muted" : "Active"}
                 </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Voice Analysis */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mic className="w-5 h-5" />
-                  Voice Analysis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VoiceAnalysisDisplay
-                  voiceMetrics={voiceMetrics}
-                  audioLevel={voiceAudioLevel}
-                  isAnalyzing={isAnalyzing}
-                  isRecording={isRecording}
-                  isSpeaking={isSpeaking}
-                />
-              </CardContent>
-            </Card>
-          </div>
+        {/* DEBUG INFO */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span>Room Name:</span>
+                <span className="font-mono">{roomData.roomName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Connection State:</span>
+                <span className="font-mono">{room.connectionState || 'undefined'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Local Participant:</span>
+                <span className="font-mono">{room.localParticipant?.identity || 'none'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Participants Count:</span>
+                <span className="font-mono">{room.participants?.size || 'undefined'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Audio Level:</span>
+                <span className="font-mono">{Math.round(audioLevel)}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Conversation Summary */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Conversation Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Duration</span>
-                    <Badge variant="outline">{formatTime(sessionTimer)}</Badge>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Audio Level</span>
-                    <Badge variant={voiceAudioLevel > 20 ? "default" : "secondary"}>
-                      {Math.round(voiceAudioLevel)}%
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* End Session Button */}
-            <Card className="mt-6">
-              <CardContent className="pt-6">
-                <Button 
-                  onClick={onEnd}
-                  variant="destructive"
-                  className="w-full"
-                >
-                  <Square className="mr-2 h-4 w-4" />
-                  End Conversation
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+        {/* CONTROLS */}
+        <div className="flex gap-4">
+          <Button onClick={toggleMic} variant={isMicMuted ? "secondary" : "default"}>
+            {isMicMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+            {isMicMuted ? "Unmute" : "Mute"}
+          </Button>
+          
+          <Button onClick={onEnd} variant="destructive">
+            <Square className="w-4 h-4 mr-2" />
+            End Session
+          </Button>
         </div>
 
-        {/* LiveKit Audio Renderer and Controls */}
+        {/* LiveKit Audio Renderer */}
         <div className="relative">
           <RoomAudioRenderer />
         </div>
