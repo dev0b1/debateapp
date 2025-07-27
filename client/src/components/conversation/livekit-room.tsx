@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useToast } from "../../hooks/use-toast";
 import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
 import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
-import { Play, Square, Mic, MicOff, Brain, Settings } from "lucide-react";
+import { Play, Square, Mic, MicOff, Settings } from "lucide-react";
 
 interface LiveKitRoomProps {
   roomData: {
@@ -355,24 +355,10 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                 )}
               </div>
               <div className="flex items-center gap-4">
-                {isEyeTrackingInitialized && (
-                  <Badge variant="default" className="bg-green-600">
-                    <Eye className="w-3 h-3 mr-1" />
-                    Eye Tracking Active
-                  </Badge>
-                )}
-                {hasEnhancedAnalyzer && (
-                  <Badge variant="default" className="bg-blue-600">
-                    <Brain className="w-3 h-3 mr-1" />
-                    Enhanced Analysis
-                  </Badge>
-                )}
-                {hasDeepgramConnection && (
-                  <Badge variant="default" className="bg-purple-600">
-                    <Mic className="w-3 h-3 mr-1" />
-                    Deepgram Connected
-                  </Badge>
-                )}
+                <Badge variant="default" className="bg-green-600">
+                  <Mic className="w-3 h-3 mr-1" />
+                  Voice Active
+                </Badge>
               </div>
             </div>
           </CardContent>

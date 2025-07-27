@@ -95,11 +95,22 @@ async def entrypoint(ctx: agents.JobContext):
     
     try:
         print("🔄 Calling session.generate_reply()...")
-        await session.generate_reply(
+        
+        # Generate the reply and capture the response
+        response = await session.generate_reply(
             instructions=f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
         )
+        
         print("✅ Welcome message generated and sent successfully!")
+        print(f"📝 Generated text: {response}")
         print("🔊 Audio should now be playing in the room...")
+        
+        # Check if we're actually connected to the room
+        print(f"🔗 Room connection status: {ctx.room.connection_state}")
+        print(f"👥 Room participants: {len(ctx.room.participants)}")
+        for participant in ctx.room.participants:
+            print(f"   - {participant.identity}")
+            
     except Exception as e:
         print(f"❌ Error generating welcome message: {e}")
         print(f"❌ Error type: {type(e).__name__}")
