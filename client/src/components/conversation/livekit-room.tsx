@@ -111,18 +111,24 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             console.log("Waiting for connection to be established...");
             await new Promise<void>((resolve, reject) => {
               const timeout = setTimeout(() => {
-                reject(new Error("Connection timeout"));
-              }, 10000);
+                reject(new Error("Connection timeout - took longer than 60 seconds"));
+              }, 60000); // Increased timeout to 60 seconds
 
               const checkConnection = () => {
+                console.log("Current connection state:", room.connectionState);
                 if (room.connectionState === ConnectionState.Connected) {
                   clearTimeout(timeout);
+                  console.log("✅ Connection established successfully");
                   resolve();
                 } else if (room.connectionState === ConnectionState.Disconnected) {
                   clearTimeout(timeout);
-                  reject(new Error("Connection failed"));
+                  reject(new Error("Connection failed - room disconnected"));
+                } else if (room.connectionState === ConnectionState.Reconnecting) {
+                  console.log("🔄 Room is reconnecting, waiting...");
+                  setTimeout(checkConnection, 500);
                 } else {
-                  setTimeout(checkConnection, 100);
+                  console.log("⏳ Still connecting...");
+                  setTimeout(checkConnection, 500);
                 }
               };
               checkConnection();

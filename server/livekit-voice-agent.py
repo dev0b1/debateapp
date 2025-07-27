@@ -32,11 +32,17 @@ class ConversationAssistant(Agent):
 
 # ─────────────────────────────  Entrypoint  ───────────────────────────── #
 async def entrypoint(ctx: agents.JobContext):
+    print(f"🎯 Starting voice agent for room: {ctx.room.name}")
+    
     # 1️⃣  Metadata injected by your Node backend
     meta = json.loads(os.getenv("ROOM_METADATA", "{}"))
     topic = meta.get("topic", "general conversation")
     difficulty = meta.get("difficulty", "intermediate")
     context = meta.get("context", None)
+    
+    print(f"📋 Topic: {topic}")
+    print(f"📊 Difficulty: {difficulty}")
+    print(f"📝 Context: {context}")
 
     # 2️⃣  LLM plugin → OpenRouter, Gemini‑pro
     llm_plugin = openai.LLM(
@@ -60,14 +66,20 @@ async def entrypoint(ctx: agents.JobContext):
     )
 
     # 4️⃣  Start & connect
+    print("🚀 Starting agent session...")
     await session.start(
         room=ctx.room,
         agent=ConversationAssistant(topic, difficulty, context),
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
+            close_on_disconnect=False,  # Don't close immediately when user disconnects
         ),
     )
+    print("✅ Agent session started successfully")
+    
+    print("🔗 Connecting to room...")
     await ctx.connect()
+    print("✅ Connected to room successfully")
 
     # 5️⃣  Autopilot: have the LLM send the first line
     context_mention = f" (context: {context})" if context else ""

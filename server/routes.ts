@@ -67,12 +67,13 @@ router.post("/api/conversation/create-room", async (req, res) => {
     console.log("Room created:", roomName);
 
     // Wait for agent to connect (with timeout)
-    const maxWaitTime = 10000; // 10 seconds
+    const maxWaitTime = 60000; // 60 seconds - increased for slower connections
     const startTime = Date.now();
     
+    console.log(`Waiting for voice agent to connect to room: ${roomName}`);
     while (Date.now() - startTime < maxWaitTime) {
       if (liveKitService.isAgentActive(roomName)) {
-        console.log(`AI conversation started in room: ${roomName}`);
+        console.log(`✅ AI conversation started in room: ${roomName}`);
         return res.json({
           roomName,
           token,
@@ -80,7 +81,8 @@ router.post("/api/conversation/create-room", async (req, res) => {
           topic
         });
       }
-      await new Promise(resolve => setTimeout(resolve, 500)); // Check every 500ms
+      console.log(`⏳ Waiting for agent... (${Math.round((Date.now() - startTime) / 1000)}s)`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Check every 1 second
     }
 
     // If we get here, the agent didn't connect in time
