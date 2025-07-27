@@ -84,9 +84,16 @@ async def entrypoint(ctx: agents.JobContext):
 
     # 6️⃣  Autopilot: have the LLM send the first line
     context_mention = f" (context: {context})" if context else ""
-    await session.generate_reply(
-        instructions=f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
-    )
+    print(f"🎤 Generating welcome message for {topic} session{context_mention}...")
+    
+    try:
+        await session.generate_reply(
+            instructions=f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
+        )
+        print("✅ Welcome message generated and sent successfully!")
+    except Exception as e:
+        print(f"❌ Error generating welcome message: {e}")
+        raise e
     
     print("🎉 Voice agent is fully ready and waiting for user!")
 

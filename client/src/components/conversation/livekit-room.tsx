@@ -107,33 +107,39 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           console.log("Connected to LiveKit room successfully");
 
           // Wait for connection to be fully established
-          if (room.connectionState !== ConnectionState.Connected) {
-            console.log("Waiting for connection to be established...");
-            await new Promise<void>((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                reject(new Error("Connection timeout - took longer than 5 minutes"));
-              }, 300000); // Increased timeout to 5 minutes
+          console.log("Waiting for connection to be established...");
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error("Connection timeout - took longer than 5 minutes"));
+            }, 300000); // Increased timeout to 5 minutes
 
-              const checkConnection = () => {
-                console.log("Current connection state:", room.connectionState);
-                if (room.connectionState === ConnectionState.Connected) {
-                  clearTimeout(timeout);
-                  console.log("✅ Connection established successfully");
-                  resolve();
-                } else if (room.connectionState === ConnectionState.Disconnected) {
-                  clearTimeout(timeout);
-                  reject(new Error("Connection failed - room disconnected"));
-                } else if (room.connectionState === ConnectionState.Reconnecting) {
-                  console.log("🔄 Room is reconnecting, waiting...");
-                  setTimeout(checkConnection, 500);
-                } else {
-                  console.log("⏳ Still connecting...");
-                  setTimeout(checkConnection, 500);
-                }
-              };
-              checkConnection();
-            });
-          }
+            const checkConnection = () => {
+              const currentState = room.connectionState;
+              console.log("Current connection state:", currentState);
+              
+              if (currentState === ConnectionState.Connected) {
+                clearTimeout(timeout);
+                console.log("✅ Connection established successfully");
+                resolve();
+              } else if (currentState === ConnectionState.Disconnected) {
+                clearTimeout(timeout);
+                reject(new Error("Connection failed - room disconnected"));
+              } else if (currentState === ConnectionState.Reconnecting) {
+                console.log("🔄 Room is reconnecting, waiting...");
+                setTimeout(checkConnection, 500);
+              } else if (currentState === ConnectionState.Connecting) {
+                console.log("⏳ Still connecting...");
+                setTimeout(checkConnection, 500);
+              } else {
+                // Handle undefined or other states
+                console.log("⏳ Connection state unclear, waiting...");
+                setTimeout(checkConnection, 1000);
+              }
+            };
+            
+            // Start checking immediately
+            checkConnection();
+          });
 
           // Now publish the audio track
           try {
@@ -176,11 +182,45 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           // Start voice analysis after successful connection
           await startRecording();
           setIsConnected(true);
+          
+          // Wait for the AI agent to join and start speaking
+          console.log("Waiting for AI agent to join...");
+          await new Promise<void>((resolve, reject) => {
+            const agentTimeout = setTimeout(() => {
+              reject(new Error("AI agent did not join within 30 seconds"));
+            }, 30000);
+            
+            const checkForAgent = () => {
+              const participants = Array.from(room.participants.values());
+              const aiAgent = participants.find(p => p.identity === 'ai-agent');
+              
+              if (aiAgent) {
+                console.log("✅ AI agent joined the room:", aiAgent.identity);
+                clearTimeout(agentTimeout);
+                resolve();
+              } else {
+                console.log("⏳ Waiting for AI agent to join...");
+                setTimeout(checkForAgent, 1000);
+              }
+            };
+            
+            checkForAgent();
+          });
 
           room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
             console.log("Track subscribed:", track.kind, "from", participant.identity);
             if (track.kind === Track.Kind.Audio) {
-              console.log("Audio track subscribed");
+              console.log("Audio track subscribed from:", participant.identity);
+              
+              // Check if this is the AI agent speaking
+              if (participant.identity === 'ai-agent') {
+                console.log("🎤 AI agent audio track subscribed - should hear welcome message soon!");
+                toast({
+                  title: "AI Agent Connected",
+                  description: "The AI interviewer has joined. You should hear a welcome message shortly.",
+                });
+              }
+              
               track.on(TrackEvent.Muted, () => {
                 console.log("Audio track muted");
                 toast({
