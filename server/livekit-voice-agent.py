@@ -18,13 +18,14 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 load_dotenv()          # pulls environment variables from .env
 
 
-# ────────────────  Assistant prompt (topic & difficulty)  ─────────────── #
+# ────────────────  Assistant prompt (topic & difficulty & context)  ─────────────── #
 class ConversationAssistant(Agent):
-    def __init__(self, topic: str, difficulty: str):
+    def __init__(self, topic: str, difficulty: str, context: str = None):
+        context_info = f"\nContext: {context}" if context else ""
         prompt = (
             f"You are a helpful conversation‑practice partner.\n"
             f"Topic: {topic}\n"
-            f"Level: {difficulty}\n"
+            f"Level: {difficulty}{context_info}\n"
             f"Ask follow‑up questions and give concise, friendly answers."
         )
         super().__init__(instructions=prompt)
@@ -36,6 +37,7 @@ async def entrypoint(ctx: agents.JobContext):
     meta = json.loads(os.getenv("ROOM_METADATA", "{}"))
     topic = meta.get("topic", "general conversation")
     difficulty = meta.get("difficulty", "intermediate")
+    context = meta.get("context", None)
 
     # 2️⃣  LLM plugin → OpenRouter, Gemini‑pro
     llm_plugin = openai.LLM(
@@ -61,7 +63,7 @@ async def entrypoint(ctx: agents.JobContext):
     # 4️⃣  Start & connect
     await session.start(
         room=ctx.room,
-        agent=ConversationAssistant(topic, difficulty),
+        agent=ConversationAssistant(topic, difficulty, context),
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
         ),
@@ -69,8 +71,9 @@ async def entrypoint(ctx: agents.JobContext):
     await ctx.connect()
 
     # 5️⃣  Autopilot: have the LLM send the first line
+    context_mention = f" (context: {context})" if context else ""
     await session.generate_reply(
-        instructions=f"Welcome the user to their {topic} session and invite them to speak."
+        instructions=f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
     )
 
 

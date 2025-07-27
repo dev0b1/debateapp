@@ -44,7 +44,7 @@ export class LiveKitService extends EventEmitter {
     return this.isConfigured;
   }
 
-  async createConversationRoom(topicId: string): Promise<{ roomName: string; token: string; serverUrl: string; topic: ConversationTopic }> {
+  async createConversationRoom(topicId: string, context?: string): Promise<{ roomName: string; token: string; serverUrl: string; topic: ConversationTopic }> {
     if (!this.isConfigured) {
       throw new Error("LiveKit is not configured. Please set up your LiveKit credentials in the .env file.");
     }
@@ -89,11 +89,12 @@ export class LiveKitService extends EventEmitter {
         canUpdateOwnMetadata: true
       });
 
-      // Start the voice agent with topic information
+      // Start the voice agent with topic information and context
       await this.startVoiceAgent(roomName, {
         topic: topic.title,
         difficulty: topic.difficulty,
         prompt: topic.prompt,
+        context: context,
         token: await agentToken.toJwt()
       });
 
@@ -140,6 +141,7 @@ export class LiveKitService extends EventEmitter {
     topic: string; 
     difficulty: string; 
     prompt: string;
+    context?: string;
     token: string;
   }): Promise<void> {
     try {
@@ -148,6 +150,7 @@ export class LiveKitService extends EventEmitter {
         topic: options.topic,
         difficulty: options.difficulty,
         prompt: options.prompt,
+        context: options.context,
         timestamp: Date.now()
       });
 
