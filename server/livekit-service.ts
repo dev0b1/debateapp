@@ -179,8 +179,16 @@ export class LiveKitService extends EventEmitter {
 
       // Set up process monitoring
       agentProcess.stdout?.on('data', (data) => {
-        console.log(`Voice Agent ${roomName}:`, data.toString());
-        this.emit('agentLog', { roomName, type: 'stdout', data: data.toString() });
+        const output = data.toString();
+        console.log(`Voice Agent ${roomName}:`, output);
+        
+        // Check if agent is ready
+        if (output.includes('🎉 Voice agent is fully ready')) {
+          this.agentReadyStatus.set(roomName, true);
+          console.log(`✅ Voice Agent ${roomName} is ready!`);
+        }
+        
+        this.emit('agentLog', { roomName, type: 'stdout', data: output });
       });
 
       agentProcess.stderr?.on('data', (data) => {
@@ -261,9 +269,24 @@ export class LiveKitService extends EventEmitter {
     }
   }
 
+  private agentReadyStatus = new Map<string, boolean>();
+
   isAgentActive(roomName: string): boolean {
     const agent = this.activeAgents.get(roomName);
-    return !!agent && !agent.killed;
+    const isProcessRunning = !!agent && !agent.killed;
+    const isReady = this.agentReadyStatus.get(roomName) || false;
+    
+    // Log the status for debugging
+    console.log(`Agent status for ${roomName}:`, {
+      hasAgent: !!agent,
+      isKilled: agent?.killed,
+      isProcessRunning,
+      isReady
+    });
+    
+    // For now, just check if process is running
+    // In the future, we could require both process running AND ready status
+    return isProcessRunning;
   }
 }
 

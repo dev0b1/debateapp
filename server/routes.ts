@@ -67,7 +67,7 @@ router.post("/api/conversation/create-room", async (req, res) => {
     console.log("Room created:", roomName);
 
     // Wait for agent to connect (with timeout)
-    const maxWaitTime = 60000; // 60 seconds - increased for slower connections
+    const maxWaitTime = 300000; // 5 minutes - increased for voice agent initialization
     const startTime = Date.now();
     
     console.log(`Waiting for voice agent to connect to room: ${roomName}`);

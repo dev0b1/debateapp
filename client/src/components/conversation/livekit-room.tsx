@@ -111,8 +111,8 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             console.log("Waiting for connection to be established...");
             await new Promise<void>((resolve, reject) => {
               const timeout = setTimeout(() => {
-                reject(new Error("Connection timeout - took longer than 60 seconds"));
-              }, 60000); // Increased timeout to 60 seconds
+                reject(new Error("Connection timeout - took longer than 5 minutes"));
+              }, 300000); // Increased timeout to 5 minutes
 
               const checkConnection = () => {
                 console.log("Current connection state:", room.connectionState);

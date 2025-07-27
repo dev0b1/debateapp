@@ -65,7 +65,12 @@ async def entrypoint(ctx: agents.JobContext):
         #turn_detection=MultilingualModel(),
     )
 
-    # 4️⃣  Start & connect
+    # 4️⃣  Connect to room first
+    print("🔗 Connecting to room...")
+    await ctx.connect()
+    print("✅ Connected to room successfully")
+    
+    # 5️⃣  Start agent session after connection
     print("🚀 Starting agent session...")
     await session.start(
         room=ctx.room,
@@ -76,16 +81,14 @@ async def entrypoint(ctx: agents.JobContext):
         ),
     )
     print("✅ Agent session started successfully")
-    
-    print("🔗 Connecting to room...")
-    await ctx.connect()
-    print("✅ Connected to room successfully")
 
-    # 5️⃣  Autopilot: have the LLM send the first line
+    # 6️⃣  Autopilot: have the LLM send the first line
     context_mention = f" (context: {context})" if context else ""
     await session.generate_reply(
         instructions=f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
     )
+    
+    print("🎉 Voice agent is fully ready and waiting for user!")
 
 
 if __name__ == "__main__":
