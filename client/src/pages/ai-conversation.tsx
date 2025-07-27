@@ -17,8 +17,8 @@ import {
   TrendingUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useVoiceAnalyzer } from "@/hooks/use-voice-analyzer";
-import { VoiceAnalysisDisplay } from "@/components/conversation/voice-analysis-display";
+// import { useVoiceAnalyzer } from "@/hooks/use-voice-analyzer";
+// import { VoiceAnalysisDisplay } from "@/components/conversation/voice-analysis-display";
 import { SessionFeedback } from "@/components/conversation/session-feedback";
 import { LiveKitRoom } from "@/components/conversation/livekit-room";
 
@@ -140,32 +140,32 @@ export default function AIConversation() {
 
 
   // Voice analysis hook - always call these
-  const {
-    audioLevel,
-    isRecording,
-    voiceMetrics,
-    isAnalyzing,
-    isSpeaking,
-    sessionRecording: voiceSessionRecording,
-    startRecording,
-    stopRecording,
-    toggleMute,
-    resetAnalysis,
-    getVoiceAnalysisSummary,
-    getSessionFeedback
-  } = useVoiceAnalyzer({
-    enableSessionRecording: true
-  });
+  // const {
+  //   audioLevel,
+  //   isRecording,
+  //   voiceMetrics,
+  //   isAnalyzing,
+  //   isSpeaking,
+  //   sessionRecording: voiceSessionRecording,
+  //   startRecording,
+  //   stopRecording,
+  //   toggleMute,
+  //   resetAnalysis,
+  //   getVoiceAnalysisSummary,
+  //   getSessionFeedback
+  // } = useVoiceAnalyzer({
+  //   enableSessionRecording: true
+  // });
 
-  // Start voice recording when conversation starts
-  useEffect(() => {
-    if (isInConversation && roomData) {
-      startRecording();
-      return () => {
-        stopRecording();
-      };
-    }
-  }, [isInConversation, roomData, startRecording, stopRecording]);
+  // Start voice recording when conversation starts - COMMENTED OUT FOR DEBUGGING
+  // useEffect(() => {
+  //   if (isInConversation && roomData) {
+  //     startRecording();
+  //     return () => {
+  //       stopRecording();
+  //     };
+  //   }
+  // }, [isInConversation, roomData, startRecording, stopRecording]);
 
   if (isInConversation && roomData) {
 
@@ -183,15 +183,15 @@ export default function AIConversation() {
           </div>
           <Button 
             onClick={() => {
-              // Stop recording and get session feedback
-              stopRecording();
+              // Stop recording and get session feedback - COMMENTED OUT FOR DEBUGGING
+              // stopRecording();
               
-              // Get session feedback data
-              const feedback = getSessionFeedback();
-              if (feedback) {
-                setSessionRecording(feedback);
-                setShowFeedback(true);
-              }
+              // Get session feedback data - COMMENTED OUT FOR DEBUGGING
+              // const feedback = getSessionFeedback();
+              // if (feedback) {
+              //   setSessionRecording(feedback);
+              //   setShowFeedback(true);
+              // }
               
               endConversation();
             }}
@@ -219,35 +219,12 @@ export default function AIConversation() {
         )}
 
         {/* Conversation Interface */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Voice Analysis */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mic className="w-5 h-5" />
-                  Voice Analysis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VoiceAnalysisDisplay
-                  voiceMetrics={voiceMetrics}
-                  audioLevel={audioLevel}
-                  isAnalyzing={isAnalyzing}
-                  isRecording={isRecording}
-                  isSpeaking={isSpeaking}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* AI Interview */}
-          <div>
-            <LiveKitRoom 
-              roomData={roomData}
-              onEnd={endConversation}
-            />
-          </div>
+        <div className="grid grid-cols-1 gap-6">
+          {/* AI Interview - FULL WIDTH FOR DEBUGGING */}
+          <LiveKitRoom 
+            roomData={roomData}
+            onEnd={endConversation}
+          />
         </div>
 
         {/* Session Feedback */}
