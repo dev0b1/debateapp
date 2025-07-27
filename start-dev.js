@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
-const { spawn } = require('child_process');
-const path = require('path');
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 console.log('🚀 Starting Confidence Compass Development Environment...\n');
 
@@ -11,14 +15,14 @@ let serverArgs = ['server/index.ts'];
 
 // Try to use npx tsx if tsx is not available globally
 try {
-  require.resolve('tsx');
+  await import('tsx');
 } catch (e) {
   console.log('📦 Using npx tsx...');
   serverCommand = 'npx';
   serverArgs = ['tsx', 'server/index.ts'];
 }
 
-// Start the main server (which now includes head pose detector management)
+// Start the main server
 const server = spawn(serverCommand, serverArgs, {
   stdio: 'inherit',
   shell: true
@@ -51,5 +55,5 @@ client.on('error', (err) => {
 console.log('✅ All services started!');
 console.log('📱 Client: http://localhost:3000');
 console.log('🔧 Server: http://localhost:5000');
-console.log('🤖 Head Pose Detector: Managed by Node.js server');
+console.log('🎤 Voice Analysis: Client-side processing');
 console.log('\nPress Ctrl+C to stop all services\n'); 
