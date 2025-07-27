@@ -38,11 +38,11 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       autoGainControl: true,
     },
     stopLocalTrackOnUnpublish: true,
-    // Add debugging options
+    // Optimized for voice conversation (lower latency)
     publishDefaults: {
       simulcast: false,
       videoSimulcastLayers: [],
-      audioPreset: 'music',
+      audioPreset: 'voice', // Changed from 'music' to 'voice' for lower latency
       videoPreset: 'none'
     }
   }));
@@ -88,7 +88,11 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
               audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true
+                autoGainControl: true,
+                // Optimize for voice conversation
+                sampleRate: 16000, // Lower sample rate for voice
+                channelCount: 1,    // Mono for voice
+                latency: 0.01       // Lower latency
               } 
             });
             console.log("Microphone access granted");

@@ -60,6 +60,9 @@ async def entrypoint(ctx: agents.JobContext):
         tts=cartesia.TTS(
             model="sonic-2",
             voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",
+            # Optimize for lower latency
+            sample_rate=16000,  # Lower sample rate for voice
+            speed=1.0,          # Normal speed
         ),
         vad=silero.VAD.load(),
         #turn_detection=MultilingualModel(),
@@ -107,9 +110,12 @@ async def entrypoint(ctx: agents.JobContext):
         
         # Check if we're actually connected to the room
         print(f"🔗 Room connection status: {ctx.room.connection_state}")
-        print(f"👥 Room participants: {len(ctx.room.participants)}")
-        for participant in ctx.room.participants:
-            print(f"   - {participant.identity}")
+        print(f"👥 Room participants: {len(ctx.room.participants) if hasattr(ctx.room, 'participants') else 'N/A'}")
+        if hasattr(ctx.room, 'participants'):
+            for participant in ctx.room.participants:
+                print(f"   - {participant.identity}")
+        else:
+            print("   - Participants info not available")
             
     except Exception as e:
         print(f"❌ Error generating welcome message: {e}")
