@@ -43,7 +43,11 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       simulcast: false,
       videoSimulcastLayers: [],
       audioPreset: 'music', // Back to music for better quality
-      videoPreset: 'none'
+      videoPreset: 'none',
+      // Disable Opus optimizations that might cause crackly audio
+      audioCodec: 'opus',
+      dtx: false, // Disable Discontinuous Transmission
+      red: false  // Disable Redundant Encoding
     }
   }));
   const [error, setError] = useState<string | null>(null);
@@ -206,13 +210,33 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           
           // Wait for room to be ready and check for AI agent
           console.log("Waiting for room to be ready...");
-          await new Promise<void>((resolve) => {
+          await new Promise<void>((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 30; // 3 seconds max
+            
             const checkRoomReady = () => {
-              if (room.participants !== undefined) {
-                console.log("✅ Room is ready");
+              attempts++;
+              
+              // Check multiple conditions for room readiness
+              const isConnected = room.connectionState === ConnectionState.Connected;
+              const hasLocalParticipant = room.localParticipant !== null;
+              const participantsAvailable = room.participants !== undefined;
+              
+              console.log(`🔍 Room status check ${attempts}/${maxAttempts}:`, {
+                connectionState: room.connectionState,
+                hasLocalParticipant,
+                participantsAvailable,
+                participantsCount: room.participants?.size || 'undefined'
+              });
+              
+              if (isConnected && hasLocalParticipant) {
+                console.log("✅ Room is ready (connected with local participant)");
                 resolve();
+              } else if (attempts >= maxAttempts) {
+                console.log("⚠️ Room ready timeout, proceeding anyway...");
+                resolve(); // Continue anyway
               } else {
-                console.log("⏳ Room not ready yet, waiting...");
+                console.log(`⏳ Room not ready yet, waiting... (${attempts}/${maxAttempts})`);
                 setTimeout(checkRoomReady, 100);
               }
             };
@@ -220,15 +244,40 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           });
           
           console.log("Checking for AI agent...");
-          const participants = Array.from(room.participants!.values());
-          console.log("Current participants:", participants.map(p => p.identity));
           
-          const aiAgent = participants.find(p => p.identity === 'ai-agent');
-          if (aiAgent) {
-            console.log("✅ AI agent already in room:", aiAgent.identity);
+          // Safely check participants
+          if (room.participants) {
+            const participants = Array.from(room.participants.values());
+            console.log("Current participants:", participants.map(p => p.identity));
+            
+            const aiAgent = participants.find(p => p.identity === 'ai-agent');
+            if (aiAgent) {
+              console.log("✅ AI agent already in room:", aiAgent.identity);
+            } else {
+              console.log("⏳ AI agent not yet in room, will join shortly...");
+            }
           } else {
-            console.log("⏳ AI agent not yet in room, will join shortly...");
+            console.log("⏳ Participants not available yet, AI agent will join shortly...");
           }
+
+          room.on(RoomEvent.ParticipantConnected, (participant) => {
+            console.log("🎉 Participant connected:", participant.identity);
+            console.log("🔍 Participant Details:", {
+              identity: participant.identity,
+              sid: participant.sid,
+              isLocal: participant.isLocal,
+              isSpeaking: participant.isSpeaking,
+              audioLevel: participant.audioLevel
+            });
+            
+            if (participant.identity === 'ai-agent') {
+              console.log("🤖 AI Agent joined the room!");
+              toast({
+                title: "AI Agent Joined",
+                description: "The AI interviewer has joined the conversation.",
+              });
+            }
+          });
 
           room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
             console.log("Track subscribed:", track.kind, "from", participant.identity);
@@ -238,6 +287,13 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
               // Check if this is the AI agent speaking
               if (participant.identity === 'ai-agent') {
                 console.log("🎤 AI agent audio track subscribed - should hear welcome message soon!");
+                console.log("🔍 AI Agent Details:", {
+                  identity: participant.identity,
+                  sid: participant.sid,
+                  isLocal: participant.isLocal,
+                  isSpeaking: participant.isSpeaking,
+                  audioLevel: participant.audioLevel
+                });
                 toast({
                   title: "AI Agent Connected",
                   description: "The AI interviewer has joined. You should hear a welcome message shortly.",
@@ -254,6 +310,15 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                 
                 track.on(TrackEvent.Unmuted, () => {
                   console.log("🔊 AI agent audio unmuted");
+                });
+                
+                // Monitor for audio quality issues
+                track.on(TrackEvent.Ended, () => {
+                  console.log("🔇 AI agent audio track ended");
+                });
+                
+                track.on(TrackEvent.Started, () => {
+                  console.log("🔊 AI agent audio track started");
                 });
               }
               
@@ -283,6 +348,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             }
           });
 
+          // Set up event listeners for the room
           room.on(RoomEvent.ConnectionStateChanged, (state) => {
             console.log("Connection state changed:", state);
             console.log("Room URL:", roomData.serverUrl);

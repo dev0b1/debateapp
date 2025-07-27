@@ -111,6 +111,20 @@ async def entrypoint(ctx: agents.JobContext):
             print(f"📄 Actual LLM text: {response.message}")
         elif hasattr(response, 'content'):
             print(f"📄 Actual LLM text: {response.content}")
+        elif hasattr(response, 'chat_items'):
+            # Try to get text from chat items
+            chat_items = response.chat_items
+            if chat_items and len(chat_items) > 0:
+                last_item = chat_items[-1]
+                if hasattr(last_item, 'text'):
+                    print(f"📄 Actual LLM text: {last_item.text}")
+                elif hasattr(last_item, 'message'):
+                    print(f"📄 Actual LLM text: {last_item.message}")
+                else:
+                    print(f"📄 Chat item type: {type(last_item)}")
+                    print(f"📄 Chat item attributes: {dir(last_item)}")
+            else:
+                print("📄 No chat items found")
         else:
             print(f"📄 Response type: {type(response)}")
             print(f"📄 Response attributes: {dir(response)}")
