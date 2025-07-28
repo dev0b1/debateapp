@@ -38,6 +38,48 @@ class ConversationAssistant(Agent):
         super().__init__(instructions=prompt)
 
 
+def create_llm_plugin():
+    """Create LLM plugin with fallback options"""
+    
+    # Check available API keys
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    
+    print(f"🔑 API Keys available:")
+    print(f"   OpenRouter: {'✅' if openrouter_key else '❌'}")
+    print(f"   OpenAI: {'✅' if openai_key else '❌'}")
+    
+    # Try OpenRouter first (if available)
+    if openrouter_key:
+        try:
+            print("🔧 Configuring OpenRouter LLM...")
+            return openai.LLM(
+                model="mistralai/mistral-small-3.2-24b-instruct:free",
+                base_url="https://openrouter.ai/api/v1",
+                api_key=openrouter_key,
+                timeout=30.0,  # Increase timeout
+                max_retries=3   # Limit retries
+            )
+        except Exception as e:
+            print(f"⚠️ OpenRouter configuration failed: {e}")
+    
+    # Fallback to OpenAI (if available)
+    if openai_key:
+        try:
+            print("🔧 Configuring OpenAI LLM...")
+            return openai.LLM(
+                model="gpt-3.5-turbo",
+                api_key=openai_key,
+                timeout=30.0,
+                max_retries=3
+            )
+        except Exception as e:
+            print(f"⚠️ OpenAI configuration failed: {e}")
+    
+    # If no API keys available, raise error
+    raise Exception("No valid LLM API keys found. Please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file.")
+
+
 # ─────────────────────────────  Entrypoint  ───────────────────────────── #
 async def entrypoint(ctx: agents.JobContext):
     print(f"🎯 Starting voice agent for room: {ctx.room.name}")
@@ -54,14 +96,13 @@ async def entrypoint(ctx: agents.JobContext):
     print(f"📝 Context: {context}")
     print(f"👤 Interviewer Role: {interviewer_role.get('name', 'Standard') if interviewer_role else 'Standard'}")
 
-    # 2️⃣  LLM plugin → OpenRouter, Gemini‑pro
-    llm_plugin = openai.LLM(
-        model="mistralai/mistral-small-3.2-24b-instruct:free",                 # Gemini via OpenRouter
-        base_url="https://openrouter.ai/api/v1",   # put in .env
-        # OpenRouter asks for these two headers:
-        api_key=os.getenv("OPENROUTER_API_KEY")
-        
-    )
+    # 2️⃣  LLM plugin with fallback options
+    try:
+        llm_plugin = create_llm_plugin()
+        print("✅ LLM plugin configured successfully")
+    except Exception as e:
+        print(f"❌ Failed to configure LLM: {e}")
+        raise e
 
     # 3️⃣  Build the media session
     session = AgentSession(
@@ -163,7 +204,8 @@ async def entrypoint(ctx: agents.JobContext):
         print(f"❌ Error generating welcome message: {e}")
         print(f"❌ Error type: {type(e).__name__}")
         print(f"❌ Error details: {str(e)}")
-        raise e
+        # Don't raise the error - let the agent continue running
+        print("⚠️ Continuing without welcome message...")
     
     print("🎉 Voice agent is fully ready and waiting for user!")
 
