@@ -21,6 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 // import { VoiceAnalysisDisplay } from "@/components/conversation/voice-analysis-display";
 import { SessionFeedback } from "@/components/conversation/session-feedback";
 import { LiveKitRoom } from "@/components/conversation/livekit-room";
+import { SessionAnalytics } from "@/components/conversation/session-analytics";
+import { INTERVIEWER_ROLES, InterviewerRole } from "@/lib/interviewer-roles";
 
 interface InterviewSession {
   id: string;
@@ -43,6 +45,7 @@ const interviewTypes = [
 
 export default function AIConversation() {
   const [selectedInterviewType, setSelectedInterviewType] = useState('');
+  const [selectedInterviewerRole, setSelectedInterviewerRole] = useState<InterviewerRole>(INTERVIEWER_ROLES[0]);
   const [interviewContext, setInterviewContext] = useState('');
   const [isInConversation, setIsInConversation] = useState(false);
   const [roomData, setRoomData] = useState<any>(null);
@@ -51,6 +54,8 @@ export default function AIConversation() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [sessionRecording, setSessionRecording] = useState<any>(null);
   const [currentQuestion, setCurrentQuestion] = useState('');
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [sessionAnalytics, setSessionAnalytics] = useState<any>(null);
   const processingRef = useRef<string | null>(null);
   const { toast } = useToast();
 
@@ -118,9 +123,15 @@ export default function AIConversation() {
       context: interviewContext || undefined
     };
 
+    // Add interviewer role to the session data
+    const sessionWithRole = {
+      ...sessionData,
+      interviewerRole: selectedInterviewerRole
+    };
+
     setProcessing(true);
     processingRef.current = sessionData.id;
-    createRoomMutation.mutate(sessionData);
+    createRoomMutation.mutate(sessionWithRole);
   };
 
   const endConversation = () => {
@@ -221,11 +232,22 @@ export default function AIConversation() {
         {/* Conversation Interface */}
         <div className="grid grid-cols-1 gap-6">
           {/* AI Interview - FULL WIDTH FOR DEBUGGING */}
-          <LiveKitRoom 
-            roomData={roomData}
-            onEnd={endConversation}
-          />
+            <LiveKitRoom 
+              roomData={roomData}
+              onEnd={endConversation}
+            />
+          </div>
+
+        {/* Session Analytics */}
+        {showAnalytics && sessionAnalytics && (
+          <div className="mt-8">
+            <SessionAnalytics
+              questionHistory={sessionAnalytics.questionHistory}
+              sessionStats={sessionAnalytics.sessionStats}
+              onClose={() => setShowAnalytics(false)}
+            />
         </div>
+        )}
 
         {/* Session Feedback */}
         {showFeedback && sessionRecording && (
@@ -267,7 +289,7 @@ export default function AIConversation() {
           <AlertTitle className="text-amber-800">Setup Required</AlertTitle>
           <AlertDescription className="text-amber-700">
             <div className="space-y-2">
-              <p>AI interview features require API keys to be configured. You can still use other features like face tracking and voice analysis in demo mode.</p>
+              <p>AI interview features require API keys to be configured. You can still use other features like voice analysis in demo mode.</p>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100">
                   <Settings className="mr-2 h-4 w-4" />
@@ -314,6 +336,31 @@ export default function AIConversation() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="interviewer-role">Choose Your Interviewer</Label>
+              <div className="grid grid-cols-1 gap-3 mt-2">
+                {INTERVIEWER_ROLES.map((role) => (
+                  <div
+                    key={role.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                      selectedInterviewerRole.id === role.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setSelectedInterviewerRole(role)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{role.emoji}</span>
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900">{role.name}</h3>
+                        <p className="text-sm text-gray-600">{role.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
             
             <div className="space-y-2">

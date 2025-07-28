@@ -15,6 +15,9 @@ import { useToast } from "../../hooks/use-toast";
 // import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
 // import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
 import { Square, Mic, MicOff } from "lucide-react";
+import { VideoRecording } from "./video-recording";
+import { QuestionTimer } from "./question-timer";
+import { useQuestionSession } from "../../hooks/use-question-session";
 
 interface LiveKitRoomProps {
   roomData: {
@@ -61,6 +64,25 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const { toast } = useToast();
 
+  // Question session management
+  const {
+    currentQuestion,
+    questionHistory,
+    isActive: isQuestionActive,
+    questionNumber,
+    startQuestion,
+    endQuestion,
+    addFaceTrackingData,
+    startSession,
+    endSession,
+    getSessionStats,
+    getCurrentQuestionInfo,
+    shouldEndSession
+  } = useQuestionSession({
+    maxQuestions: 5, // Limit to 5 questions for demo
+    defaultDuration: 180000 // 3 minutes default
+  });
+
   // Enhanced voice analyzer - COMMENTED OUT FOR DEBUGGING
   // const {
   //   audioLevel: voiceAudioLevel,
@@ -79,7 +101,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   //   enableSessionRecording: true
   // });
 
-    useEffect(() => {
+  useEffect(() => {
     let mounted = true;
     let isConnecting = false; // Prevent multiple simultaneous connections
 
@@ -182,14 +204,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
             const updateAudioLevel = () => {
               if (mounted) {
-                analyser.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                  sum += dataArray[i];
-                }
-                const average = sum / dataArray.length;
-                setAudioLevel(Math.round(average));
-                requestAnimationFrame(updateAudioLevel);
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const average = sum / dataArray.length;
+              setAudioLevel(Math.round(average));
+              requestAnimationFrame(updateAudioLevel);
               }
             };
             updateAudioLevel();
@@ -367,6 +389,22 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             }
           });
 
+          // Handle AI agent responses and start question timers
+          room.on(RoomEvent.DataReceived, (payload) => {
+            if (payload.data && typeof payload.data === 'string') {
+              const aiResponse = payload.data;
+              console.log('🤖 AI Agent Response:', aiResponse);
+              
+              // Start a new question timer if this is a question
+              if (aiResponse.includes('?') || 
+                  aiResponse.toLowerCase().includes('tell me') ||
+                  aiResponse.toLowerCase().includes('describe') ||
+                  aiResponse.toLowerCase().includes('how would')) {
+                startQuestion(aiResponse);
+              }
+            }
+          });
+
           // Set up event listeners for the room
           room.on(RoomEvent.ConnectionStateChanged, (state) => {
             console.log("Connection state changed:", state);
@@ -375,12 +413,15 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             console.log("Local participant:", room.localParticipant?.identity);
             
             // Log connection quality
-            if (state === ConnectionState.Connected) {
-              console.log("📊 Connection quality info:");
-              console.log("   - Room URL:", roomData.serverUrl);
-              console.log("   - Connection state:", room.connectionState);
-              console.log("   - Participants:", room.participants?.size || 0);
-            }
+                      if (state === ConnectionState.Connected) {
+            console.log("📊 Connection quality info:");
+            console.log("   - Room URL:", roomData.serverUrl);
+            console.log("   - Connection state:", room.connectionState);
+            console.log("   - Participants:", room.participants?.size || 0);
+            
+            // Start question session when connected
+            startSession();
+          }
             
             switch (state) {
               case ConnectionState.Connecting:
@@ -454,7 +495,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       }
       // stopRecording(); // COMMENTED OUT FOR DEBUGGING
       if (room.connectionState !== ConnectionState.Disconnected) {
-        room.disconnect();
+      room.disconnect();
       }
     };
   }, [room, roomData.serverUrl, roomData.token]);
@@ -483,7 +524,13 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       <Card className="p-4">
         <CardContent>
           <p className="text-red-500">{error}</p>
-          <Button onClick={onEnd} className="mt-4">
+          <Button onClick={() => {
+            // End question session and get stats
+            const sessionStats = getSessionStats();
+            console.log('📊 Session Statistics:', sessionStats);
+            endSession();
+            onEnd();
+          }} className="mt-4">
             End Session
           </Button>
         </CardContent>
@@ -516,48 +563,83 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                 <Badge variant="outline">{formatTime(sessionTimer)}</Badge>
                 <Badge variant="outline">
                   Connection: {room.connectionState || 'undefined'}
-                </Badge>
+                  </Badge>
               </div>
               <div className="flex items-center gap-4">
                 <Badge variant={isMicMuted ? "secondary" : "default"}>
-                  <Mic className="w-3 h-3 mr-1" />
+                    <Mic className="w-3 h-3 mr-1" />
                   {isMicMuted ? "Muted" : "Active"}
-                </Badge>
+                  </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* DEBUG INFO */}
-        <Card>
-          <CardHeader>
+            <Card>
+              <CardHeader>
             <CardTitle>Debug Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+              </CardHeader>
+              <CardContent className="space-y-4">
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span>Room Name:</span>
                 <span className="font-mono">{roomData.roomName}</span>
-              </div>
+                  </div>
               <div className="flex justify-between">
                 <span>Connection State:</span>
                 <span className="font-mono">{room.connectionState || 'undefined'}</span>
-              </div>
+                  </div>
               <div className="flex justify-between">
                 <span>Local Participant:</span>
                 <span className="font-mono">{room.localParticipant?.identity || 'none'}</span>
-              </div>
+                  </div>
               <div className="flex justify-between">
                 <span>Participants Count:</span>
                 <span className="font-mono">{room.participants?.size || 'undefined'}</span>
-              </div>
+                        </div>
               <div className="flex justify-between">
                 <span>Audio Level:</span>
                 <span className="font-mono">{Math.round(audioLevel)}%</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                    </div>
+                  </div>
+              </CardContent>
+            </Card>
+
+        {/* Question Timer */}
+        {getCurrentQuestionInfo() && (
+          <QuestionTimer
+            question={getCurrentQuestionInfo()!.question}
+            duration={getCurrentQuestionInfo()!.duration}
+            onTimeUp={() => {
+              endQuestion();
+              toast({
+                title: "Time's Up!",
+                description: "Moving to the next question...",
+              });
+            }}
+            onNextQuestion={() => {
+              // This will be handled by the AI agent automatically
+              console.log("Timer expired, waiting for next question from AI agent");
+            }}
+            questionNumber={getCurrentQuestionInfo()!.questionNumber}
+            totalQuestions={getCurrentQuestionInfo()!.totalQuestions}
+            isActive={isQuestionActive}
+          />
+        )}
+
+        {/* Video Recording */}
+        <VideoRecording 
+          roomName={roomData.roomName}
+          isActive={isConnected}
+          onRecordingComplete={(recordingData) => {
+            console.log('Recording completed:', recordingData);
+            toast({
+              title: "Recording Complete",
+              description: `Session recorded for ${recordingData.duration} seconds.`,
+            });
+          }}
+        />
 
         {/* CONTROLS */}
         <div className="flex gap-4">
@@ -566,10 +648,16 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             {isMicMuted ? "Unmute" : "Mute"}
           </Button>
           
-          <Button onClick={onEnd} variant="destructive">
+          <Button onClick={() => {
+            // End question session and get stats
+            const sessionStats = getSessionStats();
+            console.log('📊 Session Statistics:', sessionStats);
+            endSession();
+            onEnd();
+          }} variant="destructive">
             <Square className="w-4 h-4 mr-2" />
             End Session
-          </Button>
+                </Button>
         </div>
 
         {/* LiveKit Audio Renderer */}

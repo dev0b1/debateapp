@@ -93,12 +93,7 @@ export function FeatureStatus() {
       description: "Live voice conversations",
       required: "LiveKit Configuration"
     },
-    {
-      name: "Eye Tracking",
-      enabled: status.features.eyeTracking,
-      description: "Face detection and eye contact tracking",
-      required: "Camera Permission"
-    },
+
     {
       name: "Session Recording",
       enabled: status.features.sessionRecording,

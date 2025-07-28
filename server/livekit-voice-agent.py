@@ -19,14 +19,22 @@ load_dotenv()          # pulls environment variables from .env
 
 # ────────────────  Assistant prompt (topic & difficulty & context)  ─────────────── #
 class ConversationAssistant(Agent):
-    def __init__(self, topic: str, difficulty: str, context: str = None):
+    def __init__(self, topic: str, difficulty: str, context: str = None, interviewer_role: dict = None):
         context_info = f"\nContext: {context}" if context else ""
-        prompt = (
-            f"You are a helpful conversation‑practice partner.\n"
-            f"Topic: {topic}\n"
-            f"Level: {difficulty}{context_info}\n"
-            f"Ask follow‑up questions and give concise, friendly answers."
-        )
+        
+        # Use interviewer role prompt if available, otherwise use default
+        if interviewer_role and interviewer_role.get('prompt'):
+            prompt = interviewer_role['prompt']
+            if context_info:
+                prompt += context_info
+        else:
+            prompt = (
+                f"You are a helpful conversation‑practice partner.\n"
+                f"Topic: {topic}\n"
+                f"Level: {difficulty}{context_info}\n"
+                f"Ask follow‑up questions and give concise, friendly answers."
+            )
+        
         super().__init__(instructions=prompt)
 
 
@@ -39,10 +47,12 @@ async def entrypoint(ctx: agents.JobContext):
     topic = meta.get("topic", "general conversation")
     difficulty = meta.get("difficulty", "intermediate")
     context = meta.get("context", None)
+    interviewer_role = meta.get("interviewerRole", None)
     
     print(f"📋 Topic: {topic}")
     print(f"📊 Difficulty: {difficulty}")
     print(f"📝 Context: {context}")
+    print(f"👤 Interviewer Role: {interviewer_role.get('name', 'Standard') if interviewer_role else 'Standard'}")
 
     # 2️⃣  LLM plugin → OpenRouter, Gemini‑pro
     llm_plugin = openai.LLM(
@@ -77,7 +87,7 @@ async def entrypoint(ctx: agents.JobContext):
     print("🚀 Starting agent session...")
     await session.start(
         room=ctx.room,
-        agent=ConversationAssistant(topic, difficulty, context),
+        agent=ConversationAssistant(topic, difficulty, context, interviewer_role),
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
             close_on_disconnect=False,  # Don't close immediately when user disconnects
@@ -100,9 +110,15 @@ async def entrypoint(ctx: agents.JobContext):
         print("🔄 Calling session.generate_reply()...")
         
         # Generate the reply and capture the response
+        welcome_instructions = f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
+        
+        # Add interruption instructions for tough interviewer
+        if interviewer_role and interviewer_role.get('id') == 'tough':
+            welcome_instructions += "\n\nIMPORTANT: You are a tough hiring manager. If the user rambles, uses too many filler words, or takes too long to answer, interrupt them with phrases like 'That's enough, let's move on' or 'You're not answering the question directly'."
+        
         response = await session.generate_reply(
-            instructions=f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
-        )
+            instructions=welcome_instructions
+    )
         
         print("✅ Welcome message generated and sent successfully!")
         print(f"📝 Generated response object: {response}")

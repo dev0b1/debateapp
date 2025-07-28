@@ -32,9 +32,10 @@ router.get("/api/conversation/topics", (req, res) => {
 // Create a LiveKit conversation room with AI voice agent
 router.post("/api/conversation/create-room", async (req, res) => {
   try {
-    const { topicId, context } = req.body;
+    const { topicId, context, interviewerRole } = req.body;
     console.log("Creating conversation room for topic ID:", topicId);
     console.log("Context provided:", context || "None");
+    console.log("Interviewer role:", interviewerRole?.name || "Standard");
     
     if (!topicId) {
       console.log("Missing topicId in request body");
@@ -63,7 +64,7 @@ router.post("/api/conversation/create-room", async (req, res) => {
 
     // Create room and get token
     console.log("Creating LiveKit room for topic:", topic.title);
-    const { roomName, token } = await liveKitService.createConversationRoom(topicId, context);
+    const { roomName, token } = await liveKitService.createConversationRoom(topicId, context, interviewerRole);
     console.log("Room created:", roomName);
 
     // Wait for agent to connect (with timeout)
