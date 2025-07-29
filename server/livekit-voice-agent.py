@@ -85,7 +85,7 @@ def create_llm_plugin():
     print(f"   OpenAI: {'✅' if openai_key else '❌'}")
     
     # Try OpenRouter first (if available)
-    if openrouter_key:
+    if openrouter_key and openrouter_key != "your_openrouter_api_key_here":
         try:
             print("🔧 Configuring OpenRouter LLM...")
             return openai.LLM(
@@ -98,8 +98,8 @@ def create_llm_plugin():
         except Exception as e:
             print(f"⚠️ OpenRouter configuration failed: {e}")
     
-    # Fallback to OpenAI (if available)
-    if openai_key:
+    # Fallback to OpenAI (if available and not placeholder)
+    if openai_key and openai_key != "your_openai_api_key_here":
         try:
             print("🔧 Configuring OpenAI LLM...")
             return openai.LLM(
@@ -111,8 +111,23 @@ def create_llm_plugin():
         except Exception as e:
             print(f"⚠️ OpenAI configuration failed: {e}")
     
-    # If no API keys available, raise error
-    raise Exception("No valid LLM API keys found. Please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file.")
+    # If no valid API keys available, create a mock LLM for testing
+    print("⚠️ No valid LLM API keys found. Creating mock LLM for testing...")
+    print("💡 To use real AI features, please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file")
+    
+    # Return a mock LLM that provides basic responses
+    class MockLLM:
+        async def generate(self, messages, **kwargs):
+            # Return a simple mock response
+            return type('MockResponse', (), {
+                'choices': [type('MockChoice', (), {
+                    'message': type('MockMessage', (), {
+                        'content': "Hello! I'm a mock AI interviewer. Please set up your API keys to use the full AI features."
+                    })()
+                })()]
+            })()
+    
+    return MockLLM()
 
 
 def get_voice_config(interviewer_role):
@@ -143,7 +158,18 @@ async def entrypoint(ctx: agents.JobContext):
         print("✅ LLM plugin configured successfully")
     except Exception as e:
         print(f"❌ Failed to configure LLM: {e}")
-        raise e
+        print("⚠️ Continuing with mock LLM for testing...")
+        # Create a basic mock LLM as fallback
+        class MockLLM:
+            async def generate(self, messages, **kwargs):
+                return type('MockResponse', (), {
+                    'choices': [type('MockChoice', (), {
+                        'message': type('MockMessage', (), {
+                            'content': "Hello! I'm a mock AI interviewer. Please set up your API keys to use the full AI features."
+                        })()
+                    })()]
+                })()
+        llm_plugin = MockLLM()
 
     # 3️⃣  Get voice configuration based on interviewer role
     voice_config = get_voice_config(interviewer_role)
@@ -216,22 +242,30 @@ async def entrypoint(ctx: agents.JobContext):
         print("✅ Welcome message generated and sent successfully!")
         print(f"📝 Generated response object: {response}")
         
-        # Extract the actual text from the response
+        # Extract the actual text from the response (handle both real and mock LLM)
+        response_text = ""
         if hasattr(response, 'text'):
-            print(f"📄 Actual LLM text: {response.text}")
+            response_text = response.text
         elif hasattr(response, 'message'):
-            print(f"📄 Actual LLM text: {response.message}")
+            response_text = response.message
         elif hasattr(response, 'content'):
-            print(f"📄 Actual LLM text: {response.content}")
+            response_text = response.content
+        elif hasattr(response, 'choices') and len(response.choices) > 0:
+            # Handle OpenAI-style responses
+            choice = response.choices[0]
+            if hasattr(choice, 'message'):
+                response_text = choice.message.content
+            elif hasattr(choice, 'text'):
+                response_text = choice.text
         elif hasattr(response, 'chat_items'):
             # Try to get text from chat items
             chat_items = response.chat_items
             if chat_items and len(chat_items) > 0:
                 last_item = chat_items[-1]
                 if hasattr(last_item, 'text'):
-                    print(f"📄 Actual LLM text: {last_item.text}")
+                    response_text = last_item.text
                 elif hasattr(last_item, 'message'):
-                    print(f"📄 Actual LLM text: {last_item.message}")
+                    response_text = last_item.message
                 else:
                     print(f"📄 Chat item type: {type(last_item)}")
                     print(f"📄 Chat item attributes: {dir(last_item)}")
@@ -240,6 +274,11 @@ async def entrypoint(ctx: agents.JobContext):
         else:
             print(f"📄 Response type: {type(response)}")
             print(f"📄 Response attributes: {dir(response)}")
+        
+        if response_text:
+            print(f"📄 Actual LLM text: {response_text}")
+        else:
+            print("📄 No response text extracted")
         
         print("🔊 Audio should now be playing in the room...")
         
