@@ -230,13 +230,15 @@ export default function AIConversation() {
         )}
 
         {/* Conversation Interface */}
-        <div className="grid grid-cols-1 gap-6">
-          {/* AI Interview - FULL WIDTH FOR DEBUGGING */}
+        <div className="space-y-6">
+          {/* AI Interview - FULL WIDTH FOR BETTER EXPERIENCE */}
+          <div className="w-full">
             <LiveKitRoom 
               roomData={roomData}
               onEnd={endConversation}
             />
           </div>
+        </div>
 
         {/* Session Analytics */}
         {showAnalytics && sessionAnalytics && (

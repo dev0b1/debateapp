@@ -8,6 +8,34 @@ const router = Router();
 // Add test routes
 router.use(testRouter);
 
+// WebSocket-like endpoint for current question updates
+router.get("/api/conversation/current-question/:roomName", (req, res) => {
+  const { roomName } = req.params;
+  
+  // Set up Server-Sent Events for real-time question updates
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  // Listen for current question updates from the LiveKit service
+  const questionHandler = (data: { roomName: string; question: string }) => {
+    if (data.roomName === roomName) {
+      res.write(`data: ${JSON.stringify({ question: data.question })}\n\n`);
+    }
+  };
+
+  liveKitService.on('currentQuestion', questionHandler);
+
+  // Clean up when client disconnects
+  req.on('close', () => {
+    liveKitService.off('currentQuestion', questionHandler);
+  });
+});
+
 // Get current user (demo implementation)
 router.get("/api/user/current", (req, res) => {
   res.json({

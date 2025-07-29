@@ -172,6 +172,7 @@ export class LiveKitService extends EventEmitter {
           LIVEKIT_ROOM_NAME: roomName,
           OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
           DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
+          CARTESIA_API_KEY: process.env.CARTESIA_API_KEY,
           ROOM_METADATA: metadata
         },
         cwd: process.cwd()
@@ -189,6 +190,17 @@ export class LiveKitService extends EventEmitter {
         if (output.includes('🎉 Voice agent is fully ready')) {
           this.agentReadyStatus.set(roomName, true);
           console.log(`✅ Voice Agent ${roomName} is ready!`);
+        }
+        
+        // Extract current question from AI responses
+        if (output.includes('📄 Actual LLM text:')) {
+          const match = output.match(/📄 Actual LLM text: (.+)/);
+          if (match) {
+            const currentQuestion = match[1].trim();
+            console.log(`🎤 Current question: ${currentQuestion}`);
+            // Emit the current question to the frontend
+            this.emit('currentQuestion', { roomName, question: currentQuestion });
+          }
         }
         
         this.emit('agentLog', { roomName, type: 'stdout', data: output });

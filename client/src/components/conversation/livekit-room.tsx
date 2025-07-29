@@ -14,7 +14,7 @@ import { Badge } from "../ui/badge";
 import { useToast } from "../../hooks/use-toast";
 // import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
 // import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
-import { Square, Mic, MicOff } from "lucide-react";
+import { Square, Mic, MicOff, MessageCircle } from "lucide-react";
 import { VideoRecording } from "./video-recording";
 import { QuestionTimer } from "./question-timer";
 import { useQuestionSession } from "../../hooks/use-question-session";
@@ -58,15 +58,18 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [currentQuestion, setCurrentQuestion] = useState<string>("");
+  const [questionTimer, setQuestionTimer] = useState(0);
   const timerRef = useRef<NodeJS.Timeout>();
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
   const hasConnectedRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const questionTimerRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
 
   // Question session management
   const {
-    currentQuestion,
+    currentQuestion: sessionQuestion,
     questionHistory,
     isActive: isQuestionActive,
     questionNumber,
@@ -82,6 +85,54 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     maxQuestions: 5, // Limit to 5 questions for demo
     defaultDuration: 180000 // 3 minutes default
   });
+
+  // Real-time question updates
+  useEffect(() => {
+    if (roomData?.roomName) {
+      const eventSource = new EventSource(`/api/conversation/current-question/${roomData.roomName}`);
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.question) {
+            setCurrentQuestion(data.question);
+            // Reset question timer when new question is received
+            setQuestionTimer(0);
+          }
+        } catch (error) {
+          console.error('Error parsing question update:', error);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error('EventSource error:', error);
+        eventSource.close();
+      };
+
+      return () => {
+        eventSource.close();
+      };
+    }
+  }, [roomData?.roomName]);
+
+  // Question timer
+  useEffect(() => {
+    if (currentQuestion && isConnected) {
+      questionTimerRef.current = setInterval(() => {
+        setQuestionTimer(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (questionTimerRef.current) {
+        clearInterval(questionTimerRef.current);
+      }
+    }
+
+    return () => {
+      if (questionTimerRef.current) {
+        clearInterval(questionTimerRef.current);
+      }
+    };
+  }, [currentQuestion, isConnected]);
 
   // Enhanced voice analyzer - COMMENTED OUT FOR DEBUGGING
   // const {
@@ -551,82 +602,163 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   return (
     <RoomContext.Provider value={room}>
       <div className="h-full space-y-6">
-        {/* MINIMAL DEBUG UI */}
-        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
+        {/* CURRENT QUESTION DISPLAY - PROMINENT */}
+        {currentQuestion && (
+          <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-green-900">
+                <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                  <span className="font-medium">LiveKit Debug Mode</span>
+                  <span>Current Question</span>
                 </div>
-                <Badge variant="outline">{formatTime(sessionTimer)}</Badge>
-                <Badge variant="outline">
-                  Connection: {room.connectionState || 'undefined'}
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono">
+                    {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
                   </Badge>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <MessageCircle className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-green-800 text-lg leading-relaxed">{currentQuestion}</p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span>AI Interviewer is listening...</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                <Badge variant={isMicMuted ? "secondary" : "default"}>
-                    <Mic className="w-3 h-3 mr-1" />
-                  {isMicMuted ? "Muted" : "Active"}
-                  </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* DEBUG INFO */}
-            <Card>
+        {/* MAIN INTERVIEW INTERFACE */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* VIDEO AREA - PROMINENT */}
+          <div className="lg:col-span-2">
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
               <CardHeader>
-            <CardTitle>Debug Information</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                    <span>AI Interview Session</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="font-mono">
+                      {formatTime(sessionTimer)}
+                    </Badge>
+                    <Badge variant={isMicMuted ? "secondary" : "default"}>
+                      {isMicMuted ? <MicOff className="w-3 h-3 mr-1" /> : <Mic className="w-3 h-3 mr-1" />}
+                      {isMicMuted ? "Muted" : "Active"}
+                    </Badge>
+                  </div>
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Room Name:</span>
-                <span className="font-mono">{roomData.roomName}</span>
-                  </div>
-              <div className="flex justify-between">
-                <span>Connection State:</span>
-                <span className="font-mono">{room.connectionState || 'undefined'}</span>
-                  </div>
-              <div className="flex justify-between">
-                <span>Local Participant:</span>
-                <span className="font-mono">{room.localParticipant?.identity || 'none'}</span>
-                  </div>
-              <div className="flex justify-between">
-                <span>Participants Count:</span>
-                <span className="font-mono">{room.participants?.size || 'undefined'}</span>
-                        </div>
-              <div className="flex justify-between">
-                <span>Audio Level:</span>
-                <span className="font-mono">{Math.round(audioLevel)}%</span>
+              <CardContent>
+                {/* Video Placeholder - Enhanced */}
+                <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg border-2 border-dashed border-blue-300 flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto">
+                      <Mic className="w-10 h-10 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                        AI Interview in Progress
+                      </h3>
+                      <p className="text-blue-700 text-sm">
+                        Your AI interviewer is listening and responding
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-blue-600">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                      <span className="text-sm font-medium">Live Audio</span>
                     </div>
                   </div>
+                </div>
+                
+                {/* Audio Level Indicator */}
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-700">Audio Level</span>
+                    <span className="text-sm text-gray-500">{Math.round(audioLevel)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-100"
+                      style={{ width: `${audioLevel}%` }}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* SIDEBAR - CONTROLS AND INFO */}
+          <div className="space-y-4">
+            {/* Session Controls */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Session Controls</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  onClick={toggleMic} 
+                  variant={isMicMuted ? "secondary" : "default"}
+                  className="w-full"
+                >
+                  {isMicMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+                  {isMicMuted ? "Unmute" : "Mute"}
+                </Button>
+                
+                <Button 
+                  onClick={() => {
+                    const sessionStats = getSessionStats();
+                    console.log('📊 Session Statistics:', sessionStats);
+                    endSession();
+                    onEnd();
+                  }} 
+                  variant="destructive"
+                  className="w-full"
+                >
+                  <Square className="w-4 h-4 mr-2" />
+                  End Interview
+                </Button>
               </CardContent>
             </Card>
 
-        {/* Question Timer */}
-        {getCurrentQuestionInfo() && (
-          <QuestionTimer
-            question={getCurrentQuestionInfo()!.question}
-            duration={getCurrentQuestionInfo()!.duration}
-            onTimeUp={() => {
-              endQuestion();
-              toast({
-                title: "Time's Up!",
-                description: "Moving to the next question...",
-              });
-            }}
-            onNextQuestion={() => {
-              // This will be handled by the AI agent automatically
-              console.log("Timer expired, waiting for next question from AI agent");
-            }}
-            questionNumber={getCurrentQuestionInfo()!.questionNumber}
-            totalQuestions={getCurrentQuestionInfo()!.totalQuestions}
-            isActive={isQuestionActive}
-          />
-        )}
+            {/* Session Info */}
+            <Card className="bg-gray-50">
+              <CardHeader>
+                <CardTitle className="text-sm">Session Info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Room:</span>
+                  <span className="font-mono text-xs">{roomData.roomName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Status:</span>
+                  <span className="font-mono text-xs">{room.connectionState || 'connecting'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Participants:</span>
+                  <span className="font-mono text-xs">{room.participants?.size || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Question Time:</span>
+                  <span className="font-mono text-xs">
+                    {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {/* Video Recording */}
         <VideoRecording 
@@ -640,25 +772,6 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             });
           }}
         />
-
-        {/* CONTROLS */}
-        <div className="flex gap-4">
-          <Button onClick={toggleMic} variant={isMicMuted ? "secondary" : "default"}>
-            {isMicMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
-            {isMicMuted ? "Unmute" : "Mute"}
-          </Button>
-          
-          <Button onClick={() => {
-            // End question session and get stats
-            const sessionStats = getSessionStats();
-            console.log('📊 Session Statistics:', sessionStats);
-            endSession();
-            onEnd();
-          }} variant="destructive">
-            <Square className="w-4 h-4 mr-2" />
-            End Session
-                </Button>
-        </div>
 
         {/* LiveKit Audio Renderer */}
         <div className="relative">

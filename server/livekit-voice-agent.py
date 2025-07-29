@@ -17,6 +17,41 @@ from livekit.plugins import (
 load_dotenv()          # pulls environment variables from .env
 
 
+# Voice configurations for different interviewer roles
+VOICE_CONFIGS = {
+    'standard': {
+        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Professional, calm
+        'speed': 1.0,
+        'sample_rate': 24000,
+        'tone': 'professional'
+    },
+    'tough': {
+        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Same voice but different prompt
+        'speed': 1.1,  # Slightly faster for more direct feel
+        'sample_rate': 24000,
+        'tone': 'direct'
+    },
+    'friendly': {
+        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Same voice but warmer prompt
+        'speed': 0.95,  # Slightly slower for friendlier feel
+        'sample_rate': 24000,
+        'tone': 'warm'
+    },
+    'technical': {
+        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",
+        'speed': 1.05,  # Slightly faster for technical precision
+        'sample_rate': 24000,
+        'tone': 'precise'
+    },
+    'executive': {
+        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",
+        'speed': 0.9,  # Slower for authoritative feel
+        'sample_rate': 24000,
+        'tone': 'authoritative'
+    }
+}
+
+
 # ────────────────  Assistant prompt (topic & difficulty & context)  ─────────────── #
 class ConversationAssistant(Agent):
     def __init__(self, topic: str, difficulty: str, context: str = None, interviewer_role: dict = None):
@@ -80,6 +115,12 @@ def create_llm_plugin():
     raise Exception("No valid LLM API keys found. Please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file.")
 
 
+def get_voice_config(interviewer_role):
+    """Get voice configuration based on interviewer role"""
+    role_id = interviewer_role.get('id', 'standard') if interviewer_role else 'standard'
+    return VOICE_CONFIGS.get(role_id, VOICE_CONFIGS['standard'])
+
+
 # ─────────────────────────────  Entrypoint  ───────────────────────────── #
 async def entrypoint(ctx: agents.JobContext):
     print(f"🎯 Starting voice agent for room: {ctx.room.name}")
@@ -104,27 +145,30 @@ async def entrypoint(ctx: agents.JobContext):
         print(f"❌ Failed to configure LLM: {e}")
         raise e
 
-    # 3️⃣  Build the media session
+    # 3️⃣  Get voice configuration based on interviewer role
+    voice_config = get_voice_config(interviewer_role)
+    print(f"🎤 Voice config: {voice_config['tone']} tone, speed: {voice_config['speed']}")
+
+    # 4️⃣  Build the media session with role-specific voice
     session = AgentSession(
         stt=deepgram.STT(model="nova-3", language="multi"),
         llm=llm_plugin,                            # 👈 enables autopilot
         tts=cartesia.TTS(
             model="sonic-2",
-            voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",
-            # Optimize for better audio quality
-            sample_rate=24000,  # Higher sample rate for better quality
-            speed=1.0,          # Normal speed
+            voice=voice_config['voice'],
+            sample_rate=voice_config['sample_rate'],
+            speed=voice_config['speed'],
         ),
         vad=silero.VAD.load(),
         #turn_detection=MultilingualModel(),
     )
 
-    # 4️⃣  Connect to room first
+    # 5️⃣  Connect to room first
     print("🔗 Connecting to room...")
     await ctx.connect()
     print("✅ Connected to room successfully")
     
-    # 5️⃣  Start agent session after connection
+    # 6️⃣  Start agent session after connection
     print("🚀 Starting agent session...")
     await session.start(
         room=ctx.room,
@@ -136,7 +180,7 @@ async def entrypoint(ctx: agents.JobContext):
     )
     print("✅ Agent session started successfully")
 
-    # 6️⃣  Autopilot: have the LLM send the first line
+    # 7️⃣  Autopilot: have the LLM send the first line
     context_mention = f" (context: {context})" if context else ""
     print(f"🎤 Generating welcome message for {topic} session{context_mention}...")
     
@@ -153,9 +197,17 @@ async def entrypoint(ctx: agents.JobContext):
         # Generate the reply and capture the response
         welcome_instructions = f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
         
-        # Add interruption instructions for tough interviewer
-        if interviewer_role and interviewer_role.get('id') == 'tough':
-            welcome_instructions += "\n\nIMPORTANT: You are a tough hiring manager. If the user rambles, uses too many filler words, or takes too long to answer, interrupt them with phrases like 'That's enough, let's move on' or 'You're not answering the question directly'."
+        # Add role-specific instructions
+        if interviewer_role:
+            role_id = interviewer_role.get('id', 'standard')
+            if role_id == 'tough':
+                welcome_instructions += "\n\nIMPORTANT: You are a tough hiring manager. If the user rambles, uses too many filler words, or takes too long to answer, interrupt them with phrases like 'That's enough, let's move on' or 'You're not answering the question directly'."
+            elif role_id == 'friendly':
+                welcome_instructions += "\n\nIMPORTANT: You are a friendly recruiter. Be warm and encouraging, but still ask direct questions."
+            elif role_id == 'technical':
+                welcome_instructions += "\n\nIMPORTANT: You are a technical lead. Ask specific technical questions and expect precise answers."
+            elif role_id == 'executive':
+                welcome_instructions += "\n\nIMPORTANT: You are a senior executive. Ask strategic, big-picture questions and expect strategic thinking."
         
         response = await session.generate_reply(
             instructions=welcome_instructions
