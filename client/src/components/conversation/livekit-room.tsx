@@ -228,6 +228,20 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           console.log("Room name:", room.name);
           console.log("Local participant:", room.localParticipant?.identity);
 
+          // Add a small delay to ensure room properties are available
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Safely check room properties
+          try {
+            console.log("Room properties check:");
+            console.log("   - Connection state:", room.connectionState);
+            console.log("   - Local participant:", room.localParticipant?.identity);
+            console.log("   - Participants:", room.participants?.size || 0);
+            console.log("   - Room name:", room.name);
+          } catch (error) {
+            console.log("Error checking room properties:", error);
+          }
+
           // Now publish the audio track
           try {
             if (audioTrackRef.current) {
@@ -458,30 +472,27 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
           // Set up event listeners for the room
           room.on(RoomEvent.ConnectionStateChanged, (state) => {
-            console.log("Connection state changed:", state);
-            console.log("Room URL:", roomData.serverUrl);
-            console.log("Room name:", room.name);
-            console.log("Local participant:", room.localParticipant?.identity);
-            
-            // Log connection quality
-                      if (state === ConnectionState.Connected) {
-            console.log("📊 Connection quality info:");
-            console.log("   - Room URL:", roomData.serverUrl);
-            console.log("   - Connection state:", room.connectionState);
-            console.log("   - Participants:", room.participants?.size || 0);
-            
-            // Start question session when connected
-            startSession();
-          }
+            console.log("🔄 Connection state changed:", state);
+            setIsConnected(state === ConnectionState.Connected);
             
             switch (state) {
               case ConnectionState.Connecting:
-                toast({ title: "Connecting", description: "Establishing connection to the room..." });
+                toast({ title: "Connecting", description: "Connecting to conversation room..." });
+                console.log("🔄 Room connecting...");
                 break;
               case ConnectionState.Connected:
                 toast({ title: "Connected", description: "Successfully connected to conversation room." });
                 console.log("✅ Room connected successfully");
-                console.log("Participants:", room.participants.size);
+                // Fix: Add null check for participants with try-catch
+                try {
+                  if (room.participants) {
+                    console.log("Participants:", room.participants.size);
+                  } else {
+                    console.log("Participants: Not available yet");
+                  }
+                } catch (error) {
+                  console.log("Participants: Error accessing participants property:", error);
+                }
                 break;
               case ConnectionState.Disconnected:
                 toast({
