@@ -67,13 +67,18 @@ class ConversationAssistant(Agent):
                 f"You are a professional interviewer conducting a {topic} interview.\n"
                 f"Level: {difficulty}{context_info}\n"
                 f"RULES:\n"
-                f"- Ask direct questions immediately\n"
-                f"- Keep responses under 2 sentences\n"
-                f"- Don't explain or lecture\n"
-                f"- Interrupt if candidate rambles\n"
-                f"- Ask for specific examples\n"
-                f"- Be strict about vague answers\n"
-                f"BE DIRECT: Ask questions immediately. Don't explain why."
+                f"- Start with a brief professional introduction\n"
+                f"- Ask relevant questions based on the interview type\n"
+                f"- Listen to the candidate's responses and ask follow-up questions\n"
+                f"- Be responsive and conversational, not robotic\n"
+                f"- Keep the interview flowing naturally\n"
+                f"- Ask for specific examples when needed\n"
+                f"- Be professional but engaging\n"
+                f"INTERVIEW APPROACH:\n"
+                f"- Introduce yourself briefly\n"
+                f"- Ask the first relevant question\n"
+                f"- Respond to their answers with follow-up questions\n"
+                f"- Keep the conversation engaging and professional"
             )
         
         super().__init__(instructions=prompt)
@@ -138,18 +143,36 @@ async def entrypoint(ctx: agents.JobContext):
     print(f"🎤 Voice config: {voice_config['tone']} tone, speed: {voice_config['speed']}")
 
     # 4️⃣  Build the media session with role-specific voice
-    session = AgentSession(
-        stt=deepgram.STT(model="nova-3", language="multi"),
-        llm=llm_plugin,                            # 👈 enables autopilot
-        tts=cartesia.TTS(
-            model="sonic-2",
-            voice=voice_config['voice'],
-            sample_rate=voice_config['sample_rate'],
-            speed=voice_config['speed'],
-        ),
-        vad=silero.VAD.load(),
-        #turn_detection=MultilingualModel(),
-    )
+    # Check if Cartesia is available, otherwise use fallback
+    cartesia_key = os.getenv("CARTESIA_API_KEY")
+    if not cartesia_key or cartesia_key == "your_cartesia_api_key_here":
+        print("⚠️ Cartesia API key not found, using fallback TTS...")
+        # Use a simpler TTS configuration as fallback
+        session = AgentSession(
+            stt=deepgram.STT(model="nova-3", language="multi"),
+            llm=llm_plugin,                            # 👈 enables autopilot
+            tts=cartesia.TTS(
+                model="sonic-2",
+                voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Default voice
+                sample_rate=24000,
+                speed=1.0,
+            ),
+            vad=silero.VAD.load(),
+        )
+    else:
+        print("✅ Using Cartesia TTS with role-specific voice")
+        session = AgentSession(
+            stt=deepgram.STT(model="nova-3", language="multi"),
+            llm=llm_plugin,                            # 👈 enables autopilot
+            tts=cartesia.TTS(
+                model="sonic-2",
+                voice=voice_config['voice'],
+                sample_rate=voice_config['sample_rate'],
+                speed=voice_config['speed'],
+            ),
+            vad=silero.VAD.load(),
+            #turn_detection=MultilingualModel(),
+        )
 
     # 5️⃣  Connect to room first
     print("🔗 Connecting to room...")
@@ -183,20 +206,32 @@ async def entrypoint(ctx: agents.JobContext):
     try:
         print("🔄 Calling session.generate_reply()...")
         
-        # Generate a direct, interview-style welcome message
-        welcome_instructions = f"Start the {topic} interview immediately. Ask the first question without any introduction or explanation. Be direct and concise - just ask the question."
+        # Generate a proper interview-style welcome message
+        welcome_instructions = f"""Start the {topic} interview with a brief professional introduction and then ask the first relevant question.
+
+INTERVIEW FLOW:
+1. Brief professional introduction (1-2 sentences)
+2. Ask the first interview question related to {topic}
+3. Be responsive to the candidate's answers
+4. Ask follow-up questions based on their responses
+5. Keep the conversation flowing naturally
+
+CONTEXT: {context if context else 'General interview'}
+ROLE: {interviewer_role.get('name', 'Standard Interviewer') if interviewer_role else 'Standard Interviewer'}
+
+Start with a brief introduction and then ask your first question."""
         
         # Add role-specific instructions for more realistic interview behavior
         if interviewer_role:
             role_id = interviewer_role.get('id', 'standard')
             if role_id == 'tough':
-                welcome_instructions += "\n\nYou are a tough hiring manager. Ask challenging questions immediately. Interrupt if they ramble. Be strict and direct."
+                welcome_instructions += "\n\nYou are a tough hiring manager. Be direct and challenging, but still professional. Ask specific questions and push for concrete examples."
             elif role_id == 'friendly':
-                welcome_instructions += "\n\nYou are a friendly recruiter. Be warm but still ask direct questions. Don't over-explain."
+                welcome_instructions += "\n\nYou are a friendly recruiter. Be warm and encouraging, but still professional. Make the candidate feel comfortable while getting the information you need."
             elif role_id == 'technical':
-                welcome_instructions += "\n\nYou are a technical lead. Ask specific technical questions immediately. Focus on problem-solving."
+                welcome_instructions += "\n\nYou are a technical lead. Focus on technical skills and problem-solving abilities. Ask specific technical questions and assess their approach."
             elif role_id == 'executive':
-                welcome_instructions += "\n\nYou are a senior executive. Ask strategic, big-picture questions. Be direct and authoritative."
+                welcome_instructions += "\n\nYou are a senior executive. Ask strategic, big-picture questions. Focus on leadership, vision, and business impact."
         
         response = await session.generate_reply(
             instructions=welcome_instructions
@@ -258,6 +293,19 @@ async def entrypoint(ctx: agents.JobContext):
         print(f"❌ Error generating welcome message: {e}")
         print(f"❌ Error type: {type(e).__name__}")
         print(f"❌ Error details: {str(e)}")
+        
+        # Check if it's a Cartesia TTS error
+        if "402" in str(e) or "Payment Required" in str(e) or "Quota" in str(e):
+            print("💳 CARTESIA TTS ERROR: Payment required or quota exceeded")
+            print("💡 Solutions:")
+            print("   1. Check your Cartesia account balance")
+            print("   2. Verify your CARTESIA_API_KEY is correct")
+            print("   3. Visit https://cartesia.ai/ to add credits")
+            print("   4. The AI will still work for text responses, but won't speak")
+        elif "APIStatusError" in str(e):
+            print("🔧 CARTESIA API ERROR: Check your API key and account status")
+            print("💡 The AI will continue working but won't speak")
+        
         # Don't raise the error - let the agent continue running
         print("⚠️ Continuing without welcome message...")
     
