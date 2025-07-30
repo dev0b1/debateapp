@@ -66,19 +66,15 @@ class ConversationAssistant(Agent):
             prompt = (
                 f"You are a professional interviewer conducting a {topic} interview.\n"
                 f"Level: {difficulty}{context_info}\n"
-                f"RULES:\n"
-                f"- Start with a brief professional introduction\n"
-                f"- Ask relevant questions based on the interview type\n"
-                f"- Listen to the candidate's responses and ask follow-up questions\n"
-                f"- Be responsive and conversational, not robotic\n"
-                f"- Keep the interview flowing naturally\n"
-                f"- Ask for specific examples when needed\n"
+                f"Your role is to:\n"
+                f"- Introduce yourself briefly at the start\n"
+                f"- Ask relevant questions about {topic}\n"
+                f"- Listen to the candidate's responses\n"
+                f"- Ask follow-up questions based on what they say\n"
+                f"- Keep the conversation flowing naturally\n"
                 f"- Be professional but engaging\n"
-                f"INTERVIEW APPROACH:\n"
-                f"- Introduce yourself briefly\n"
-                f"- Ask the first relevant question\n"
-                f"- Respond to their answers with follow-up questions\n"
-                f"- Keep the conversation engaging and professional"
+                f"- Ask for specific examples when needed\n"
+                f"Speak naturally as a real interviewer would. Don't read out instructions or rules."
             )
         
         super().__init__(instructions=prompt)
@@ -207,19 +203,15 @@ async def entrypoint(ctx: agents.JobContext):
         print("🔄 Calling session.generate_reply()...")
         
         # Generate a proper interview-style welcome message
-        welcome_instructions = f"""Start the {topic} interview with a brief professional introduction and then ask the first relevant question.
+        welcome_instructions = f"""You are conducting a {topic} interview. 
 
-INTERVIEW FLOW:
-1. Brief professional introduction (1-2 sentences)
-2. Ask the first interview question related to {topic}
-3. Be responsive to the candidate's answers
-4. Ask follow-up questions based on their responses
-5. Keep the conversation flowing naturally
+Start by saying: "Hello, I'm [your name], and I'll be conducting your {topic} interview today. Let's begin with your background and experience."
 
-CONTEXT: {context if context else 'General interview'}
-ROLE: {interviewer_role.get('name', 'Standard Interviewer') if interviewer_role else 'Standard Interviewer'}
+Then ask your first question related to {topic}.
 
-Start with a brief introduction and then ask your first question."""
+Be conversational and responsive to the candidate's answers. Ask follow-up questions based on what they say.
+
+Keep the interview professional but engaging."""
         
         # Add role-specific instructions for more realistic interview behavior
         if interviewer_role:
