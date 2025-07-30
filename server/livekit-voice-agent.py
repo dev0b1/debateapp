@@ -59,11 +59,11 @@ class ConversationAssistant(Agent):
         
         # Use interviewer role prompt if available, otherwise use default
         if interviewer_role and interviewer_role.get('prompt'):
-            prompt = interviewer_role['prompt']
+            system_prompt = interviewer_role['prompt']
             if context_info:
-                prompt += context_info
+                system_prompt += context_info
         else:
-            prompt = (
+            system_prompt = (
                 f"You are a professional interviewer conducting a {topic} interview.\n"
                 f"Level: {difficulty}{context_info}\n"
                 f"Your role is to:\n"
@@ -77,7 +77,7 @@ class ConversationAssistant(Agent):
                 f"Speak naturally as a real interviewer would. Don't read out instructions or rules."
             )
         
-        super().__init__(instructions=prompt)
+        super().__init__(instructions=system_prompt)
 
 
 def create_llm_plugin():
@@ -94,7 +94,7 @@ def create_llm_plugin():
     try:
         print("🔧 Configuring OpenRouter LLM...")
         return openai.LLM(
-            model="deepseek/deepseek-chat-v3-0324:free",
+            model="mistralai/mistral-small-3.2-24b-instruct:free",
             base_url="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
             timeout=30.0
@@ -202,32 +202,8 @@ async def entrypoint(ctx: agents.JobContext):
     try:
         print("🔄 Calling session.generate_reply()...")
         
-        # Generate a proper interview-style welcome message
-        welcome_instructions = f"""You are conducting a {topic} interview. 
-
-Start by saying: "Hello, I'm [your name], and I'll be conducting your {topic} interview today. Let's begin with your background and experience."
-
-Then ask your first question related to {topic}.
-
-Be conversational and responsive to the candidate's answers. Ask follow-up questions based on what they say.
-
-Keep the interview professional but engaging."""
-        
-        # Add role-specific instructions for more realistic interview behavior
-        if interviewer_role:
-            role_id = interviewer_role.get('id', 'standard')
-            if role_id == 'tough':
-                welcome_instructions += "\n\nYou are a tough hiring manager. Be direct and challenging, but still professional. Ask specific questions and push for concrete examples."
-            elif role_id == 'friendly':
-                welcome_instructions += "\n\nYou are a friendly recruiter. Be warm and encouraging, but still professional. Make the candidate feel comfortable while getting the information you need."
-            elif role_id == 'technical':
-                welcome_instructions += "\n\nYou are a technical lead. Focus on technical skills and problem-solving abilities. Ask specific technical questions and assess their approach."
-            elif role_id == 'executive':
-                welcome_instructions += "\n\nYou are a senior executive. Ask strategic, big-picture questions. Focus on leadership, vision, and business impact."
-        
-        response = await session.generate_reply(
-            instructions=welcome_instructions
-    )
+        # Just trigger the conversation to start - the system prompt is already set in the Agent
+        response = await session.generate_reply()
         
         print("✅ Welcome message generated and sent successfully!")
         print(f"📝 Generated response object: {response}")
