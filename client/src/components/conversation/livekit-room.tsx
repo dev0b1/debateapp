@@ -10,11 +10,8 @@ import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-// import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { useToast } from "../../hooks/use-toast";
-// import { useVoiceAnalyzer } from "../../hooks/use-voice-analyzer";
-// import { VoiceAnalysisDisplay } from "../conversation/voice-analysis-display";
-import { Square, Mic, MicOff, MessageCircle } from "lucide-react";
+import { Square, Mic, MicOff, MessageCircle, Phone, PhoneOff, Settings, Users, Clock } from "lucide-react";
 import { VideoRecording } from "./video-recording";
 import { QuestionTimer } from "./question-timer";
 import { useQuestionSession } from "../../hooks/use-question-session";
@@ -29,8 +26,6 @@ interface LiveKitRoomProps {
   onEnd: () => void;
 }
 
-
-
 export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
   const [room] = useState(() => new Room({
     adaptiveStream: true,
@@ -41,16 +36,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       autoGainControl: true,
     },
     stopLocalTrackOnUnpublish: true,
-    // Audio settings for good quality
     publishDefaults: {
       simulcast: false,
       videoSimulcastLayers: [],
-      audioPreset: 'music', // Back to music for better quality
+      audioPreset: 'music',
       videoPreset: 'none',
-      // Disable Opus optimizations that might cause crackly audio
       audioCodec: 'opus',
-      dtx: false, // Disable Discontinuous Transmission
-      red: false  // Disable Redundant Encoding
+      dtx: false,
+      red: false
     }
   }));
   const [error, setError] = useState<string | null>(null);
@@ -82,8 +75,8 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     getCurrentQuestionInfo,
     shouldEndSession
   } = useQuestionSession({
-    maxQuestions: 5, // Limit to 5 questions for demo
-    defaultDuration: 180000 // 3 minutes default
+    maxQuestions: 5,
+    defaultDuration: 180000
   });
 
   // Real-time question updates
@@ -96,17 +89,15 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
           const data = JSON.parse(event.data);
           if (data.question) {
             setCurrentQuestion(data.question);
-            // Reset question timer when new question is received
             setQuestionTimer(0);
           }
         } catch (error) {
-          console.error('Error parsing question update:', error);
+          console.error('Error parsing question data:', error);
         }
       };
 
       eventSource.onerror = (error) => {
         console.error('EventSource error:', error);
-        eventSource.close();
       };
 
       return () => {
@@ -115,464 +106,177 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     }
   }, [roomData?.roomName]);
 
-  // Question timer
+  // Session timer
   useEffect(() => {
-    if (currentQuestion && isConnected) {
-      questionTimerRef.current = setInterval(() => {
-        setQuestionTimer(prev => prev + 1);
+    if (isConnected) {
+      timerRef.current = setInterval(() => {
+        setSessionTimer(prev => prev + 1);
       }, 1000);
-    } else {
-      if (questionTimerRef.current) {
-        clearInterval(questionTimerRef.current);
-      }
     }
 
     return () => {
-      if (questionTimerRef.current) {
-        clearInterval(questionTimerRef.current);
-      }
-    };
-  }, [currentQuestion, isConnected]);
-
-  // Enhanced voice analyzer - COMMENTED OUT FOR DEBUGGING
-  // const {
-  //   audioLevel: voiceAudioLevel,
-  //   isRecording,
-  //   voiceMetrics,
-  //   isSpeaking,
-  //   sessionRecording,
-  //   isAnalyzing,
-  //   startRecording,
-  //   stopRecording,
-  //   toggleMute,
-  //   resetAnalysis,
-  //   getVoiceAnalysisSummary,
-  //   getSessionFeedback
-  // } = useVoiceAnalyzer({
-  //   enableSessionRecording: true
-  // });
-
-  useEffect(() => {
-    let mounted = true;
-    let isConnecting = false; // Prevent multiple simultaneous connections
-
-    // Don't connect if already connected
-    if (isConnected || hasConnectedRef.current) {
-      console.log("🔄 Skipping useEffect - already connected");
-      return;
-    }
-
-    const connect = async () => {
-      if (isConnecting) {
-        console.log("🔄 Already connecting, skipping...");
-        return;
-      }
-      
-      // Check if already connected or connecting
-      if (room.connectionState === ConnectionState.Connected || 
-          room.connectionState === ConnectionState.Connecting) {
-        console.log(`✅ Room is ${room.connectionState}, skipping connection...`);
-        return;
-      }
-      
-      // Check if we've already connected once
-      if (hasConnectedRef.current) {
-        console.log("✅ Already connected once, skipping reconnection...");
-        return;
-      }
-      
-      // Check if we're already connected via state
-      if (isConnected) {
-        console.log("✅ Already connected via state, skipping connection...");
-        return;
-      }
-      
-      console.log("🚀 Starting fresh connection...");
-      isConnecting = true;
-      
-      try {
-        if (mounted) {
-          console.log("Connecting to LiveKit room:", roomData);
-          
-          // First, get microphone permission and create audio track
-          let micStream: MediaStream | null = null;
-          try {
-            micStream = await navigator.mediaDevices.getUserMedia({ 
-              audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-              } 
-            });
-            console.log("Microphone access granted");
-          } catch (micErr) {
-            console.error("Mic permission denied or capture failed:", micErr);
-            toast({
-              title: "Microphone Access Denied",
-              description: "Please allow microphone access to begin the session.",
-              variant: "destructive"
-            });
-            return;
-          }
-
-          // Connect to LiveKit room with timeout
-          console.log("Connecting to LiveKit room...");
-          const connectPromise = room.connect(roomData.serverUrl, roomData.token);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Connection timeout')), 30000)
-          );
-          
-          await Promise.race([connectPromise, timeoutPromise]);
-          console.log("✅ Connected to LiveKit room successfully");
-          console.log("Connection state:", room.connectionState);
-          console.log("Room name:", room.name);
-          console.log("Local participant:", room.localParticipant?.identity);
-
-          // Add a small delay to ensure room properties are available
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Safely check room properties
-          try {
-            console.log("Room properties check:");
-            console.log("   - Connection state:", room.connectionState);
-            console.log("   - Local participant:", room.localParticipant?.identity);
-            console.log("   - Participants:", room.participants?.size || 0);
-            console.log("   - Room name:", room.name);
-          } catch (error) {
-            console.log("Error checking room properties:", error);
-          }
-
-          // Now publish the audio track
-          try {
-            if (audioTrackRef.current) {
-              console.log("🔄 Audio track already exists, stopping old one...");
-              audioTrackRef.current.stop();
-              audioTrackRef.current = null;
-            }
-            
-            const audioTrack = new LocalAudioTrack(micStream.getAudioTracks()[0]);
-            await room.localParticipant.publishTrack(audioTrack);
-            audioTrackRef.current = audioTrack;
-            console.log("✅ Published local audio track");
-
-            // Set up audio level monitoring using the same stream
-            if (!audioContextRef.current) {
-              audioContextRef.current = new AudioContext();
-              console.log("🎤 Audio context created for level monitoring");
-            }
-            const audioContext = audioContextRef.current;
-            const source = audioContext.createMediaStreamSource(micStream);
-            const analyser = audioContext.createAnalyser();
-            source.connect(analyser);
-            analyser.fftSize = 512;
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-            const updateAudioLevel = () => {
-              if (mounted) {
-              analyser.getByteFrequencyData(dataArray);
-              let sum = 0;
-              for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
-              }
-              const average = sum / dataArray.length;
-              setAudioLevel(Math.round(average));
-              requestAnimationFrame(updateAudioLevel);
-              }
-            };
-            updateAudioLevel();
-          } catch (publishErr) {
-            console.error("Error publishing audio track:", publishErr);
-            toast({
-              title: "Audio Track Error",
-              description: "Failed to publish audio track. Please try again.",
-              variant: "destructive"
-            });
-            return;
-          }
-
-          // Start voice analysis after successful connection - COMMENTED OUT FOR DEBUGGING
-          // await startRecording();
-          setIsConnected(true);
-          hasConnectedRef.current = true; // Mark as connected
-          
-          // Wait for room to be ready and check for AI agent
-          console.log("Waiting for room to be ready...");
-          await new Promise<void>((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 30; // 3 seconds max
-            
-            const checkRoomReady = () => {
-              attempts++;
-              
-              // Check multiple conditions for room readiness
-              const isConnected = room.connectionState === ConnectionState.Connected;
-              const hasLocalParticipant = room.localParticipant !== null;
-              const participantsAvailable = room.participants !== undefined;
-              
-              console.log(`🔍 Room status check ${attempts}/${maxAttempts}:`, {
-                connectionState: room.connectionState,
-                hasLocalParticipant,
-                participantsAvailable,
-                participantsCount: room.participants?.size || 'undefined'
-              });
-              
-              // If we have a local participant, consider the room ready
-              // (connectionState might be undefined due to LiveKit bug)
-              if (hasLocalParticipant) {
-                console.log("✅ Room is ready (has local participant)");
-                resolve();
-              } else if (attempts >= maxAttempts) {
-                console.log("⚠️ Room ready timeout, proceeding anyway...");
-                resolve(); // Continue anyway
-              } else {
-                console.log(`⏳ Room not ready yet, waiting... (${attempts}/${maxAttempts})`);
-                setTimeout(checkRoomReady, 100);
-              }
-            };
-            checkRoomReady();
-          });
-          
-          console.log("Checking for AI agent...");
-          
-          // Safely check participants
-          if (room.participants) {
-            const participants = Array.from(room.participants.values());
-            console.log("Current participants:", participants.map(p => p.identity));
-            
-            const aiAgent = participants.find(p => p.identity === 'ai-agent');
-            if (aiAgent) {
-              console.log("✅ AI agent already in room:", aiAgent.identity);
-            } else {
-              console.log("⏳ AI agent not yet in room, will join shortly...");
-            }
-          } else {
-            console.log("⏳ Participants not available yet, AI agent will join shortly...");
-          }
-
-          room.on(RoomEvent.ParticipantConnected, (participant) => {
-            console.log("🎉 Participant connected:", participant.identity);
-            console.log("🔍 Participant Details:", {
-              identity: participant.identity,
-              sid: participant.sid,
-              isLocal: participant.isLocal,
-              isSpeaking: participant.isSpeaking,
-              audioLevel: participant.audioLevel
-            });
-            
-            if (participant.identity === 'ai-agent') {
-              console.log("🤖 AI Agent joined the room!");
-              toast({
-                title: "AI Agent Joined",
-                description: "The AI interviewer has joined the conversation.",
-              });
-            }
-          });
-
-          room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-            console.log("🎵 Track subscribed:", track.kind, "from", participant.identity);
-            if (track.kind === Track.Kind.Audio) {
-              console.log("🔊 Audio track subscribed from:", participant.identity);
-              console.log("🔍 Track Details:", {
-                kind: track.kind,
-                source: track.source,
-                sid: track.sid,
-                isMuted: track.isMuted,
-                isEnabled: track.isEnabled,
-                participantIdentity: participant.identity,
-                participantSid: participant.sid,
-                isLocal: participant.isLocal
-              });
-              
-              // Check if this is the AI agent speaking
-              if (participant.identity === 'ai-agent') {
-                console.log("🎤 AI agent audio track subscribed - should hear welcome message soon!");
-                console.log("🔍 AI Agent Details:", {
-                  identity: participant.identity,
-                  sid: participant.sid,
-                  isLocal: participant.isLocal,
-                  isSpeaking: participant.isSpeaking,
-                  audioLevel: participant.audioLevel
-                });
-                toast({
-                  title: "AI Agent Connected",
-                  description: "The AI interviewer has joined. You should hear a welcome message shortly.",
-                });
-                
-                // Monitor audio quality
-                track.on(TrackEvent.AudioLevelChanged, (level) => {
-                  console.log("🔊 AI agent audio level:", level);
-                });
-                
-                track.on(TrackEvent.Muted, () => {
-                  console.log("🔇 AI agent audio muted");
-                });
-                
-                track.on(TrackEvent.Unmuted, () => {
-                  console.log("🔊 AI agent audio unmuted");
-                });
-                
-                // Monitor for audio quality issues
-                track.on(TrackEvent.Ended, () => {
-                  console.log("🔇 AI agent audio track ended");
-                });
-                
-                track.on(TrackEvent.Started, () => {
-                  console.log("🔊 AI agent audio track started");
-                });
-              }
-              
-              track.on(TrackEvent.Muted, () => {
-                console.log("Audio track muted");
-                toast({
-                  title: "Audio Muted",
-                  description: "The audio track has been muted. Please check your microphone settings.",
-                  variant: "destructive"
-                });
-              });
-              track.on(TrackEvent.Unmuted, () => {
-                console.log("Audio track unmuted");
-              });
-            }
-          });
-
-          room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-            console.log("🎵 Track unsubscribed:", track.kind, "from", participant.identity);
-            if (track.kind === Track.Kind.Audio) {
-              console.log("🔊 Audio track unsubscribed from:", participant.identity);
-              console.log("🔍 Unsubscribed Track Details:", {
-                kind: track.kind,
-                source: track.source,
-                sid: track.sid,
-                participantIdentity: participant.identity,
-                participantSid: participant.sid
-              });
-              toast({
-                title: "Audio Disconnected",
-                description: "The audio connection has been lost. Attempting to reconnect...",
-                variant: "destructive"
-              });
-            }
-          });
-
-          // Handle AI agent responses and start question timers
-          room.on(RoomEvent.DataReceived, (payload) => {
-            if (payload.data && typeof payload.data === 'string') {
-              const aiResponse = payload.data;
-              console.log('🤖 AI Agent Response:', aiResponse);
-              
-              // Start a new question timer if this is a question
-              if (aiResponse.includes('?') || 
-                  aiResponse.toLowerCase().includes('tell me') ||
-                  aiResponse.toLowerCase().includes('describe') ||
-                  aiResponse.toLowerCase().includes('how would')) {
-                startQuestion(aiResponse);
-              }
-            }
-          });
-
-          // Set up event listeners for the room
-          room.on(RoomEvent.ConnectionStateChanged, (state) => {
-            console.log("🔄 Connection state changed:", state);
-            setIsConnected(state === ConnectionState.Connected);
-            
-            switch (state) {
-              case ConnectionState.Connecting:
-                toast({ title: "Connecting", description: "Connecting to conversation room..." });
-                console.log("🔄 Room connecting...");
-                break;
-              case ConnectionState.Connected:
-                toast({ title: "Connected", description: "Successfully connected to conversation room." });
-                console.log("✅ Room connected successfully");
-                // Fix: Add null check for participants with try-catch
-                try {
-                  if (room.participants) {
-                    console.log("Participants:", room.participants.size);
-                  } else {
-                    console.log("Participants: Not available yet");
-                  }
-                } catch (error) {
-                  console.log("Participants: Error accessing participants property:", error);
-                }
-                break;
-              case ConnectionState.Disconnected:
-                toast({
-                  title: "Disconnected",
-                  description: "Lost connection to the room. Attempting to reconnect...",
-                  variant: "destructive"
-                });
-                console.log("❌ Room disconnected");
-                break;
-              case ConnectionState.Reconnecting:
-                toast({
-                  title: "Reconnecting",
-                  description: "Attempting to reconnect to the room...",
-                  variant: "destructive"
-                });
-                console.log("🔄 Room reconnecting");
-                break;
-            }
-          });
-
-          timerRef.current = setInterval(() => {
-            setSessionTimer(prev => prev + 1);
-          }, 1000);
-        }
-      } catch (error) {
-        console.error("Failed to connect to room:", error);
-        setError("Failed to connect to conversation room");
-        toast({
-          title: "Connection Error",
-          description: "Failed to connect to conversation room. Please try again.",
-          variant: "destructive"
-        });
-        
-        // Clean up on connection failure
-        if (audioTrackRef.current) {
-          audioTrackRef.current.stop();
-          audioTrackRef.current = null;
-        }
-        if (room.connectionState !== ConnectionState.Disconnected) {
-          room.disconnect();
-        }
-      } finally {
-        isConnecting = false; // Always reset connection flag
-      }
-    };
-    connect();
-
-    return () => {
-      mounted = false;
-      isConnecting = false; // Reset connection flag
-      hasConnectedRef.current = false; // Reset connection ref
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      if (audioTrackRef.current) {
-        audioTrackRef.current.stop();
-        audioTrackRef.current = null;
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-        audioContextRef.current = null;
-      }
-      // stopRecording(); // COMMENTED OUT FOR DEBUGGING
-      if (room.connectionState !== ConnectionState.Disconnected) {
-      room.disconnect();
+    };
+  }, [isConnected]);
+
+  // Question timer
+  useEffect(() => {
+    if (isConnected && currentQuestion) {
+      questionTimerRef.current = setInterval(() => {
+        setQuestionTimer(prev => prev + 1);
+      }, 1000);
+    }
+
+    return () => {
+      if (questionTimerRef.current) {
+        clearInterval(questionTimerRef.current);
       }
     };
-  }, [room, roomData.serverUrl, roomData.token]);
+  }, [isConnected, currentQuestion]);
+
+  const connect = async () => {
+    try {
+      console.log("🔗 Connecting to LiveKit room...");
+      
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } 
+      });
+      
+      console.log("✅ Microphone access granted");
+      
+      // Connect to room
+      await room.connect(roomData.serverUrl, roomData.token, {
+        autoSubscribe: true,
+      });
+      
+      console.log("✅ Connected to room successfully");
+      
+      // Add a small delay to ensure room properties are available
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Safely check room properties
+      try {
+        console.log("Room properties check:");
+        console.log("   - Connection state:", room.connectionState);
+        console.log("   - Local participant:", room.localParticipant?.identity);
+        console.log("   - Participants:", room.participants?.size || 0);
+        console.log("   - Room name:", room.name);
+      } catch (error) {
+        console.log("Error checking room properties:", error);
+      }
+      
+      // Set up room event listeners
+      room.on(RoomEvent.ConnectionStateChanged, (state) => {
+        console.log("🔄 Connection state changed:", state);
+        setIsConnected(state === ConnectionState.Connected);
+        
+        switch (state) {
+          case ConnectionState.Connected:
+            toast({
+              title: "Connected!",
+              description: "You're now connected to the AI interviewer.",
+            });
+            break;
+          case ConnectionState.Disconnected:
+            toast({
+              title: "Disconnected",
+              description: "Connection to the AI interviewer was lost.",
+              variant: "destructive",
+            });
+            break;
+          case ConnectionState.Connecting:
+            toast({
+              title: "Connecting...",
+              description: "Establishing connection to AI interviewer.",
+            });
+            break;
+        }
+      });
+
+      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        console.log("📡 Track subscribed:", track.kind, "from", participant.identity);
+        
+        if (track.kind === Track.Kind.Audio) {
+          toast({
+            title: "AI Interviewer Joined",
+            description: "Your AI interviewer is now in the room.",
+          });
+        }
+      });
+
+      // Set up audio level monitoring
+      const audioTrack = room.localParticipant?.audioTrack;
+      if (audioTrack) {
+        audioTrackRef.current = audioTrack;
+        
+        const updateAudioLevel = () => {
+          if (audioTrack.mediaStreamTrack) {
+            const audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(audioTrack.mediaStreamTrack);
+            const analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            const updateLevel = () => {
+              analyser.getByteFrequencyData(dataArray);
+              const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+              const level = Math.min(100, (average / 255) * 100);
+              setAudioLevel(level);
+              requestAnimationFrame(updateLevel);
+            };
+            
+            updateLevel();
+          }
+        };
+        
+        updateAudioLevel();
+      }
+
+      setIsConnected(true);
+      hasConnectedRef.current = true;
+      
+    } catch (error) {
+      console.error("❌ Connection error:", error);
+      setError(error instanceof Error ? error.message : "Failed to connect to room");
+      
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to the AI interviewer. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!hasConnectedRef.current) {
+      connect();
+    }
+  }, []);
 
   const toggleMic = () => {
-    const track = audioTrackRef.current;
-    if (track) {
-      if (isMicMuted) {
-        track.unmute();
-      } else {
-        track.mute();
-      }
-      setIsMicMuted(!isMicMuted);
+    if (isMicMuted) {
+      room.localParticipant?.setMicrophoneEnabled(true);
+      setIsMicMuted(false);
+      toast({
+        title: "Microphone Unmuted",
+        description: "Your microphone is now active.",
+      });
+    } else {
+      room.localParticipant?.setMicrophoneEnabled(false);
+      setIsMicMuted(true);
+      toast({
+        title: "Microphone Muted",
+        description: "Your microphone is now muted.",
+      });
     }
-    // toggleMute(); // COMMENTED OUT FOR DEBUGGING
   };
 
   const formatTime = (seconds: number): string => {
@@ -583,191 +287,220 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
   if (error) {
     return (
-      <Card className="p-4">
-        <CardContent>
-          <p className="text-red-500">{error}</p>
-          <Button onClick={() => {
-            // End question session and get stats
-            const sessionStats = getSessionStats();
-            console.log('📊 Session Statistics:', sessionStats);
-            endSession();
-            onEnd();
-          }} className="mt-4">
-            End Session
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                <PhoneOff className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Connection Error</h3>
+              <p className="text-red-500 text-sm">{error}</p>
+              <Button onClick={() => {
+                const sessionStats = getSessionStats();
+                console.log('📊 Session Statistics:', sessionStats);
+                endSession();
+                onEnd();
+              }} className="w-full">
+                End Session
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   if (!isConnected) {
     return (
-      <Card className="p-4">
-        <CardContent>
-          <p>Connecting to conversation room...</p>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                <Phone className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Connecting...</h3>
+              <p className="text-gray-600 text-sm">Establishing connection to AI interviewer</p>
+              <div className="flex justify-center space-x-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <RoomContext.Provider value={room}>
-      <div className="h-full space-y-6">
-        {/* CURRENT QUESTION DISPLAY - PROMINENT */}
-        {currentQuestion && (
-          <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between text-green-900">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                  <span>Current Question</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono">
-                    {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
-                  </Badge>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <MessageCircle className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-green-800 text-lg leading-relaxed">{currentQuestion}</p>
-                  <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                    <span>AI Interviewer is listening...</span>
-                  </div>
-                </div>
+      <div className="min-h-screen bg-gray-900 flex flex-col">
+        {/* Header */}
+        <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-white font-medium">AI Interview Session</span>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <Badge variant="outline" className="bg-gray-700 text-gray-200 border-gray-600">
+                <Clock className="w-3 h-3 mr-1" />
+                {formatTime(sessionTimer)}
+              </Badge>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Badge variant={isMicMuted ? "secondary" : "default"} className={isMicMuted ? "bg-red-600" : "bg-green-600"}>
+                {isMicMuted ? <MicOff className="w-3 h-3 mr-1" /> : <Mic className="w-3 h-3 mr-1" />}
+                {isMicMuted ? "Muted" : "Active"}
+              </Badge>
+              <Button
+                onClick={() => {
+                  const sessionStats = getSessionStats();
+                  console.log('📊 Session Statistics:', sessionStats);
+                  endSession();
+                  onEnd();
+                }}
+                variant="destructive"
+                size="sm"
+              >
+                <PhoneOff className="w-4 h-4 mr-2" />
+                End Call
+              </Button>
+            </div>
+          </div>
+        </div>
 
-        {/* MAIN INTERVIEW INTERFACE */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* VIDEO AREA - PROMINENT */}
-          <div className="lg:col-span-2">
-            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <span>AI Interview Session</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="font-mono">
-                      {formatTime(sessionTimer)}
-                    </Badge>
-                    <Badge variant={isMicMuted ? "secondary" : "default"}>
-                      {isMicMuted ? <MicOff className="w-3 h-3 mr-1" /> : <Mic className="w-3 h-3 mr-1" />}
-                      {isMicMuted ? "Muted" : "Active"}
-                    </Badge>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Video Placeholder - Enhanced */}
-                <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg border-2 border-dashed border-blue-300 flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto">
-                      <Mic className="w-10 h-10 text-white" />
+        {/* Main Content */}
+        <div className="flex-1 flex">
+          {/* Main Video Area */}
+          <div className="flex-1 flex flex-col">
+            {/* Video Container */}
+            <div className="flex-1 bg-gray-800 flex items-center justify-center p-8">
+              <div className="w-full max-w-4xl aspect-video bg-gray-700 rounded-lg border border-gray-600 flex items-center justify-center relative overflow-hidden">
+                {/* AI Interviewer Avatar */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center space-y-6">
+                    <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
+                      <Users className="w-16 h-16 text-white" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                        AI Interview in Progress
-                      </h3>
-                      <p className="text-blue-700 text-sm">
-                        Your AI interviewer is listening and responding
-                      </p>
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-bold text-white">AI Interviewer</h2>
+                      <p className="text-gray-300">Listening and responding to your answers</p>
                     </div>
-                    <div className="flex items-center justify-center gap-2 text-blue-600">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
-                      <span className="text-sm font-medium">Live Audio</span>
+                    {/* Audio Level Indicator */}
+                    <div className="flex justify-center space-x-1">
+                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" />
+                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }} />
+                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
                     </div>
                   </div>
                 </div>
                 
-                {/* Audio Level Indicator */}
-                <div className="mt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-medium text-gray-700">Audio Level</span>
-                    <span className="text-sm text-gray-500">{Math.round(audioLevel)}%</span>
+                {/* Connection Status */}
+                <div className="absolute top-4 left-4">
+                  <Badge className="bg-green-600">
+                    <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
+                    Live
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Current Question Display */}
+            {currentQuestion && (
+              <div className="bg-gray-800 border-t border-gray-700 p-6">
+                <div className="max-w-4xl mx-auto">
+                  <div className="bg-gray-700 rounded-lg p-6 border border-gray-600">
+                    <div className="flex items-start space-x-4">
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <MessageCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-lg font-semibold text-white">Current Question</h3>
+                          <Badge variant="outline" className="bg-gray-600 text-gray-200 border-gray-500">
+                            {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
+                          </Badge>
+                        </div>
+                        <p className="text-gray-200 text-lg leading-relaxed">{currentQuestion}</p>
+                        <div className="mt-3 flex items-center space-x-2 text-sm text-gray-400">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          <span>AI Interviewer is listening...</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="w-80 bg-gray-800 border-l border-gray-700 p-6">
+            <div className="space-y-6">
+              {/* Controls */}
+              <div className="space-y-4">
+                <h3 className="text-white font-semibold">Controls</h3>
+                <div className="space-y-3">
+                  <Button 
+                    onClick={toggleMic} 
+                    variant={isMicMuted ? "destructive" : "default"}
+                    className="w-full h-12 text-lg"
+                  >
+                    {isMicMuted ? <MicOff className="w-5 h-5 mr-2" /> : <Mic className="w-5 h-5 mr-2" />}
+                    {isMicMuted ? "Unmute" : "Mute"}
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
+                    className="w-full h-12 text-lg border-gray-600 text-gray-300 hover:bg-gray-700"
+                  >
+                    <Settings className="w-5 h-5 mr-2" />
+                    Settings
+                  </Button>
+                </div>
+              </div>
+
+              {/* Audio Level */}
+              <div className="space-y-3">
+                <h3 className="text-white font-semibold">Audio Level</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-300">Input Level</span>
+                    <span className="text-gray-400">{Math.round(audioLevel)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-3">
                     <div 
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-100"
+                      className="bg-blue-500 h-3 rounded-full transition-all duration-100"
                       style={{ width: `${audioLevel}%` }}
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
 
-          {/* SIDEBAR - CONTROLS AND INFO */}
-          <div className="space-y-4">
-            {/* Session Controls */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Session Controls</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button 
-                  onClick={toggleMic} 
-                  variant={isMicMuted ? "secondary" : "default"}
-                  className="w-full"
-                >
-                  {isMicMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
-                  {isMicMuted ? "Unmute" : "Mute"}
-                </Button>
-                
-                <Button 
-                  onClick={() => {
-                    const sessionStats = getSessionStats();
-                    console.log('📊 Session Statistics:', sessionStats);
-                    endSession();
-                    onEnd();
-                  }} 
-                  variant="destructive"
-                  className="w-full"
-                >
-                  <Square className="w-4 h-4 mr-2" />
-                  End Interview
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Session Info */}
-            <Card className="bg-gray-50">
-              <CardHeader>
-                <CardTitle className="text-sm">Session Info</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Room:</span>
-                  <span className="font-mono text-xs">{roomData.roomName}</span>
+              {/* Session Info */}
+              <div className="space-y-3">
+                <h3 className="text-white font-semibold">Session Info</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Room:</span>
+                    <span className="text-gray-200 font-mono">{roomData.roomName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Status:</span>
+                    <span className="text-green-400 font-mono">{room.connectionState}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Participants:</span>
+                    <span className="text-gray-200 font-mono">{room.participants?.size || 0}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Status:</span>
-                  <span className="font-mono text-xs">{room.connectionState || 'connecting'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Participants:</span>
-                  <span className="font-mono text-xs">{room.participants?.size || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Question Time:</span>
-                  <span className="font-mono text-xs">
-                    {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -785,7 +518,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         />
 
         {/* LiveKit Audio Renderer */}
-        <div className="relative">
+        <div className="hidden">
           <RoomAudioRenderer />
         </div>
 

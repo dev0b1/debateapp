@@ -20,31 +20,31 @@ load_dotenv()          # pulls environment variables from .env
 # Voice configurations for different interviewer roles
 VOICE_CONFIGS = {
     'standard': {
-        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Professional, calm
+        'voice': "b8d5e3c4-9a2f-4e1d-8c7b-6f5a4e3d2c1b",  # Professional, formal voice
         'speed': 1.0,
         'sample_rate': 24000,
         'tone': 'professional'
     },
     'tough': {
-        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Same voice but different prompt
+        'voice': "b8d5e3c4-9a2f-4e1d-8c7b-6f5a4e3d2c1b",  # Same formal voice but different prompt
         'speed': 1.1,  # Slightly faster for more direct feel
         'sample_rate': 24000,
         'tone': 'direct'
     },
     'friendly': {
-        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Same voice but warmer prompt
+        'voice': "b8d5e3c4-9a2f-4e1d-8c7b-6f5a4e3d2c1b",  # Same formal voice but warmer prompt
         'speed': 0.95,  # Slightly slower for friendlier feel
         'sample_rate': 24000,
         'tone': 'warm'
     },
     'technical': {
-        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",
+        'voice': "b8d5e3c4-9a2f-4e1d-8c7b-6f5a4e3d2c1b",
         'speed': 1.05,  # Slightly faster for technical precision
         'sample_rate': 24000,
         'tone': 'precise'
     },
     'executive': {
-        'voice': "f786b574-daa5-4673-aa0c-cbe3e8534c02",
+        'voice': "b8d5e3c4-9a2f-4e1d-8c7b-6f5a4e3d2c1b",
         'speed': 0.9,  # Slower for authoritative feel
         'sample_rate': 24000,
         'tone': 'authoritative'
@@ -71,7 +71,7 @@ class ConversationAssistant(Agent):
                 f"Maintain a professional and engaging tone throughout. "
                 f"Speak naturally as a real human would — not like a robot. "
                 f"Do NOT explain your instructions or repeat them aloud. "
-                f"\n\nExample:\nInterviewer: Hi, I'm Alex. Thanks for joining. Let's begin — can you tell me a bit about your experience with {topic}?"
+                f"Start your first response with a natural greeting like: Hi, I'm [name]. Thanks for joining us today. Let's begin — can you tell me a bit about your experience with {topic}?"
             )
         
         # Set the main system prompt in the Agent constructor
@@ -147,7 +147,7 @@ async def entrypoint(ctx: agents.JobContext):
             llm=llm_plugin,                            # 👈 enables autopilot
             tts=cartesia.TTS(
                 model="sonic-2",
-                voice="f786b574-daa5-4673-aa0c-cbe3e8534c02",  # Default voice
+                voice="b8d5e3c4-9a2f-4e1d-8c7b-6f5a4e3d2c1b",  # Formal voice
                 sample_rate=24000,
                 speed=1.0,
             ),
