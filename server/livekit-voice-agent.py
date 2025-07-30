@@ -74,60 +74,28 @@ class ConversationAssistant(Agent):
 
 
 def create_llm_plugin():
-    """Create LLM plugin with fallback options"""
+    """Create LLM plugin using only OpenRouter"""
     
-    # Check available API keys
+    # Check OpenRouter API key
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
     
-    print(f"🔑 API Keys available:")
-    print(f"   OpenRouter: {'✅' if openrouter_key else '❌'}")
-    print(f"   OpenAI: {'✅' if openai_key else '❌'}")
+    print(f"🔑 OpenRouter API Key: {'✅' if openrouter_key else '❌'}")
     
-    # Try OpenRouter first (if available)
-    if openrouter_key and openrouter_key != "your_openrouter_api_key_here":
-        try:
-            print("🔧 Configuring OpenRouter LLM...")
-            return openai.LLM(
-                model="mistralai/mistral-small-3.2-24b-instruct:free",
-                base_url="https://openrouter.ai/api/v1",
-                api_key=openrouter_key,
-                timeout=30.0,  # Increase timeout
-                max_retries=3   # Limit retries
-            )
-        except Exception as e:
-            print(f"⚠️ OpenRouter configuration failed: {e}")
+    if not openrouter_key or openrouter_key == "your_openrouter_api_key_here":
+        raise Exception("OPENROUTER_API_KEY is required. Please set it in your .env file.")
     
-    # Fallback to OpenAI (if available and not placeholder)
-    if openai_key and openai_key != "your_openai_api_key_here":
-        try:
-            print("🔧 Configuring OpenAI LLM...")
-            return openai.LLM(
-                model="gpt-3.5-turbo",
-                api_key=openai_key,
-                timeout=30.0,
-                max_retries=3
-            )
-        except Exception as e:
-            print(f"⚠️ OpenAI configuration failed: {e}")
-    
-    # If no valid API keys available, create a mock LLM for testing
-    print("⚠️ No valid LLM API keys found. Creating mock LLM for testing...")
-    print("💡 To use real AI features, please set OPENROUTER_API_KEY or OPENAI_API_KEY in your .env file")
-    
-    # Return a mock LLM that provides basic responses
-    class MockLLM:
-        async def generate(self, messages, **kwargs):
-            # Return a simple mock response
-            return type('MockResponse', (), {
-                'choices': [type('MockChoice', (), {
-                    'message': type('MockMessage', (), {
-                        'content': "Hello! I'm a mock AI interviewer. Please set up your API keys to use the full AI features."
-                    })()
-                })()]
-            })()
-    
-    return MockLLM()
+    try:
+        print("🔧 Configuring OpenRouter LLM...")
+        return openai.LLM(
+            model="mistralai/mistral-small-3.2-24b-instruct:free",
+            base_url="https://openrouter.ai/api/v1",
+            api_key=openrouter_key,
+            timeout=30.0,
+            max_retries=3
+        )
+    except Exception as e:
+        print(f"❌ OpenRouter configuration failed: {e}")
+        raise Exception(f"Failed to configure OpenRouter LLM: {e}")
 
 
 def get_voice_config(interviewer_role):
@@ -152,24 +120,13 @@ async def entrypoint(ctx: agents.JobContext):
     print(f"📝 Context: {context}")
     print(f"👤 Interviewer Role: {interviewer_role.get('name', 'Standard') if interviewer_role else 'Standard'}")
 
-    # 2️⃣  LLM plugin with fallback options
+    # 2️⃣  LLM plugin with OpenRouter only
     try:
         llm_plugin = create_llm_plugin()
-        print("✅ LLM plugin configured successfully")
+        print("✅ OpenRouter LLM plugin configured successfully")
     except Exception as e:
-        print(f"❌ Failed to configure LLM: {e}")
-        print("⚠️ Continuing with mock LLM for testing...")
-        # Create a basic mock LLM as fallback
-        class MockLLM:
-            async def generate(self, messages, **kwargs):
-                return type('MockResponse', (), {
-                    'choices': [type('MockChoice', (), {
-                        'message': type('MockMessage', (), {
-                            'content': "Hello! I'm a mock AI interviewer. Please set up your API keys to use the full AI features."
-                        })()
-                    })()]
-                })()
-        llm_plugin = MockLLM()
+        print(f"❌ Failed to configure OpenRouter LLM: {e}")
+        raise Exception(f"OpenRouter LLM configuration failed: {e}")
 
     # 3️⃣  Get voice configuration based on interviewer role
     voice_config = get_voice_config(interviewer_role)
@@ -212,8 +169,9 @@ async def entrypoint(ctx: agents.JobContext):
     
     # Check if Cartesia API key is available
     cartesia_key = os.getenv("CARTESIA_API_KEY")
-    if not cartesia_key:
+    if not cartesia_key or cartesia_key == "your_cartesia_api_key_here":
         print("⚠️ WARNING: CARTESIA_API_KEY not found! TTS will not work.")
+        print("💡 Please set CARTESIA_API_KEY in your .env file for text-to-speech functionality.")
     else:
         print("✅ Cartesia API key found")
     
@@ -242,7 +200,7 @@ async def entrypoint(ctx: agents.JobContext):
         print("✅ Welcome message generated and sent successfully!")
         print(f"📝 Generated response object: {response}")
         
-        # Extract the actual text from the response (handle both real and mock LLM)
+        # Extract the actual text from the response (handle OpenRouter responses)
         response_text = ""
         if hasattr(response, 'text'):
             response_text = response.text
