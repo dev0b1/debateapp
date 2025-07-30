@@ -64,10 +64,16 @@ class ConversationAssistant(Agent):
                 prompt += context_info
         else:
             prompt = (
-                f"You are a helpful conversation‑practice partner.\n"
-                f"Topic: {topic}\n"
+                f"You are a professional interviewer conducting a {topic} interview.\n"
                 f"Level: {difficulty}{context_info}\n"
-                f"Ask follow‑up questions and give concise, friendly answers."
+                f"RULES:\n"
+                f"- Ask direct questions immediately\n"
+                f"- Keep responses under 2 sentences\n"
+                f"- Don't explain or lecture\n"
+                f"- Interrupt if candidate rambles\n"
+                f"- Ask for specific examples\n"
+                f"- Be strict about vague answers\n"
+                f"BE DIRECT: Ask questions immediately. Don't explain why."
             )
         
         super().__init__(instructions=prompt)
@@ -87,7 +93,7 @@ def create_llm_plugin():
     try:
         print("🔧 Configuring OpenRouter LLM...")
         return openai.LLM(
-            model="mistralai/mistral-small-3.2-24b-instruct:free",
+            model="deepseek/deepseek-chat-v3-0324:free",
             base_url="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
             timeout=30.0
@@ -177,20 +183,20 @@ async def entrypoint(ctx: agents.JobContext):
     try:
         print("🔄 Calling session.generate_reply()...")
         
-        # Generate the reply and capture the response
-        welcome_instructions = f"Welcome the user to their {topic} session{context_mention} and invite them to speak."
+        # Generate a direct, interview-style welcome message
+        welcome_instructions = f"Start the {topic} interview immediately. Ask the first question without any introduction or explanation. Be direct and concise - just ask the question."
         
-        # Add role-specific instructions
+        # Add role-specific instructions for more realistic interview behavior
         if interviewer_role:
             role_id = interviewer_role.get('id', 'standard')
             if role_id == 'tough':
-                welcome_instructions += "\n\nIMPORTANT: You are a tough hiring manager. If the user rambles, uses too many filler words, or takes too long to answer, interrupt them with phrases like 'That's enough, let's move on' or 'You're not answering the question directly'."
+                welcome_instructions += "\n\nYou are a tough hiring manager. Ask challenging questions immediately. Interrupt if they ramble. Be strict and direct."
             elif role_id == 'friendly':
-                welcome_instructions += "\n\nIMPORTANT: You are a friendly recruiter. Be warm and encouraging, but still ask direct questions."
+                welcome_instructions += "\n\nYou are a friendly recruiter. Be warm but still ask direct questions. Don't over-explain."
             elif role_id == 'technical':
-                welcome_instructions += "\n\nIMPORTANT: You are a technical lead. Ask specific technical questions and expect precise answers."
+                welcome_instructions += "\n\nYou are a technical lead. Ask specific technical questions immediately. Focus on problem-solving."
             elif role_id == 'executive':
-                welcome_instructions += "\n\nIMPORTANT: You are a senior executive. Ask strategic, big-picture questions and expect strategic thinking."
+                welcome_instructions += "\n\nYou are a senior executive. Ask strategic, big-picture questions. Be direct and authoritative."
         
         response = await session.generate_reply(
             instructions=welcome_instructions
