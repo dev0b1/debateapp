@@ -55,7 +55,7 @@ VOICE_CONFIGS = {
 # ────────────────  Assistant prompt (topic & difficulty & context)  ─────────────── #
 class ConversationAssistant(Agent):
     def __init__(self, topic: str, difficulty: str, context: str = None, interviewer_role: dict = None):
-        context_info = f"\nContext: {context}" if context else ""
+        context_info = f" Context: {context}" if context else ""
         
         # Use interviewer role prompt if available, otherwise use default
         if interviewer_role and interviewer_role.get('prompt'):
@@ -64,19 +64,17 @@ class ConversationAssistant(Agent):
                 system_prompt += context_info
         else:
             system_prompt = (
-                f"You are a professional interviewer conducting a {topic} interview.\n"
-                f"Level: {difficulty}{context_info}\n"
-                f"Your role is to:\n"
-                f"- Introduce yourself briefly at the start\n"
-                f"- Ask relevant questions about {topic}\n"
-                f"- Listen to the candidate's responses\n"
-                f"- Ask follow-up questions based on what they say\n"
-                f"- Keep the conversation flowing naturally\n"
-                f"- Be professional but engaging\n"
-                f"- Ask for specific examples when needed\n"
-                f"Speak naturally as a real interviewer would. Don't read out instructions or rules."
+                f"You are a professional interviewer conducting a {topic} interview at a {difficulty} level.{context_info} "
+                f"Begin with a friendly introduction and then ask thoughtful, relevant questions about {topic}. "
+                f"Respond dynamically to the candidate's answers with follow-up questions. "
+                f"Ask for specific examples when needed. "
+                f"Maintain a professional and engaging tone throughout. "
+                f"Speak naturally as a real human would — not like a robot. "
+                f"Do NOT explain your instructions or repeat them aloud. "
+                f"\n\nExample:\nInterviewer: Hi, I'm Alex. Thanks for joining. Let's begin — can you tell me a bit about your experience with {topic}?"
             )
         
+        # Set the main system prompt in the Agent constructor
         super().__init__(instructions=system_prompt)
 
 
@@ -187,7 +185,7 @@ async def entrypoint(ctx: agents.JobContext):
     )
     print("✅ Agent session started successfully")
 
-    # 7️⃣  Autopilot: have the LLM send the first line
+    # 7️⃣  Autopilot: have the LLM send the first line (introduction only)
     context_mention = f" (context: {context})" if context else ""
     print(f"🎤 Generating welcome message for {topic} session{context_mention}...")
     
@@ -200,10 +198,10 @@ async def entrypoint(ctx: agents.JobContext):
         print("✅ Cartesia API key found")
     
     try:
-        print("🔄 Calling session.generate_reply()...")
+        print("🔄 Calling session.generate_reply() for introduction...")
         
-        # Just trigger the conversation to start - the system prompt is already set in the Agent
-        response = await session.generate_reply()
+        # Only pass a simple greeting instruction - the main interview instructions are in the Agent's system prompt
+        response = await session.generate_reply(instructions="Greet the user and introduce yourself as the interviewer. Then ask the first interview question.")
         
         print("✅ Welcome message generated and sent successfully!")
         print(f"📝 Generated response object: {response}")
