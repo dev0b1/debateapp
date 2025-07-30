@@ -90,8 +90,7 @@ def create_llm_plugin():
             model="mistralai/mistral-small-3.2-24b-instruct:free",
             base_url="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
-            timeout=30.0,
-            max_retries=3
+            timeout=30.0
         )
     except Exception as e:
         print(f"❌ OpenRouter configuration failed: {e}")
