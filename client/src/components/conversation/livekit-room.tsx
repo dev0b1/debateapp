@@ -136,7 +136,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
     };
   }, [isConnected, currentQuestion]);
 
-  const connect = async () => {
+    const connect = async () => {
     try {
       console.log("🔗 Connecting to LiveKit room...");
       
@@ -214,7 +214,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       // Set up audio level monitoring
       const audioTrack = room.localParticipant?.audioTrack;
       if (audioTrack) {
-        audioTrackRef.current = audioTrack;
+            audioTrackRef.current = audioTrack;
         
         const updateAudioLevel = () => {
           if (audioTrack.mediaStreamTrack) {
@@ -224,7 +224,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             source.connect(analyser);
             
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
+
             const updateLevel = () => {
               analyser.getByteFrequencyData(dataArray);
               const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
@@ -247,7 +247,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       console.error("❌ Connection error:", error);
       setError(error instanceof Error ? error.message : "Failed to connect to room");
       
-      toast({
+              toast({
         title: "Connection Failed",
         description: "Failed to connect to the AI interviewer. Please try again.",
         variant: "destructive",
@@ -257,19 +257,19 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
 
   useEffect(() => {
     if (!hasConnectedRef.current) {
-      connect();
+    connect();
     }
   }, []);
 
   const toggleMic = () => {
-    if (isMicMuted) {
+      if (isMicMuted) {
       room.localParticipant?.setMicrophoneEnabled(true);
       setIsMicMuted(false);
       toast({
         title: "Microphone Unmuted",
         description: "Your microphone is now active.",
       });
-    } else {
+      } else {
       room.localParticipant?.setMicrophoneEnabled(false);
       setIsMicMuted(true);
       toast({
@@ -296,17 +296,17 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Connection Error</h3>
               <p className="text-red-500 text-sm">{error}</p>
-              <Button onClick={() => {
-                const sessionStats = getSessionStats();
-                console.log('📊 Session Statistics:', sessionStats);
-                endSession();
-                onEnd();
+          <Button onClick={() => {
+            const sessionStats = getSessionStats();
+            console.log('📊 Session Statistics:', sessionStats);
+            endSession();
+            onEnd();
               }} className="w-full">
-                End Session
-              </Button>
+            End Session
+          </Button>
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
       </div>
     );
   }
@@ -328,8 +328,8 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
       </div>
     );
   }
@@ -373,21 +373,34 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex">
-          {/* Main Video Area */}
-          <div className="flex-1 flex flex-col">
-            {/* Video Container */}
-            <div className="flex-1 bg-gray-800 flex items-center justify-center p-8">
-              <div className="w-full max-w-4xl aspect-video bg-gray-700 rounded-lg border border-gray-600 flex items-center justify-center relative overflow-hidden">
-                {/* AI Interviewer Avatar */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center space-y-6">
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="w-full max-w-6xl">
+            {/* Video Cards Container */}
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              {/* AI Interviewer Video Card */}
+              <div className="bg-gray-700 rounded-lg border border-gray-600 overflow-hidden">
+                {/* Question Heading */}
+                {currentQuestion && (
+                  <div className="bg-blue-600 px-4 py-3 border-b border-blue-500">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-white font-semibold text-lg">Current Question</h3>
+                      <Badge variant="outline" className="bg-blue-700 text-blue-100 border-blue-500">
+                        {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
+                      </Badge>
+                    </div>
+                    <p className="text-blue-100 text-sm mt-1">{currentQuestion}</p>
+                  </div>
+                )}
+                
+                {/* AI Video Area */}
+                <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
+                  <div className="text-center space-y-4">
                     <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
                       <Users className="w-16 h-16 text-white" />
                     </div>
                     <div className="space-y-2">
-                      <h2 className="text-2xl font-bold text-white">AI Interviewer</h2>
-                      <p className="text-gray-300">Listening and responding to your answers</p>
+                      <h2 className="text-xl font-bold text-white">AI Interviewer</h2>
+                      <p className="text-gray-300 text-sm">Listening and responding</p>
                     </div>
                     {/* Audio Level Indicator */}
                     <div className="flex justify-center space-x-1">
@@ -398,106 +411,109 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                       <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
                     </div>
                   </div>
-                </div>
-                
-                {/* Connection Status */}
-                <div className="absolute top-4 left-4">
-                  <Badge className="bg-green-600">
-                    <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
-                    Live
-                  </Badge>
+                  
+                  {/* Connection Status */}
+                  <div className="absolute top-4 left-4">
+                    <Badge className="bg-green-600">
+                      <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
+                      Live
+                    </Badge>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Current Question Display */}
-            {currentQuestion && (
-              <div className="bg-gray-800 border-t border-gray-700 p-6">
-                <div className="max-w-4xl mx-auto">
-                  <div className="bg-gray-700 rounded-lg p-6 border border-gray-600">
-                    <div className="flex items-start space-x-4">
-                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                        <MessageCircle className="w-5 h-5 text-white" />
+              {/* User Video Card */}
+              <div className="bg-gray-700 rounded-lg border border-gray-600 overflow-hidden">
+                {/* User Video Area */}
+                <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
+                  <div className="text-center space-y-4">
+                    <div className="w-32 h-32 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
+                      <Mic className="w-16 h-16 text-white" />
+                    </div>
+                    <div className="space-y-2">
+                      <h2 className="text-xl font-bold text-white">You</h2>
+                      <p className="text-gray-300 text-sm">Speaking to AI interviewer</p>
+                    </div>
+                    {/* Audio Level Indicator */}
+                    <div className="flex justify-center space-x-1">
+                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" />
+                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }} />
+                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                    </div>
+                  </div>
+                  
+                  {/* Mic Status */}
+                  <div className="absolute top-4 left-4">
+                    <Badge className={isMicMuted ? "bg-red-600" : "bg-green-600"}>
+                      {isMicMuted ? <MicOff className="w-3 h-3 mr-1" /> : <Mic className="w-3 h-3 mr-1" />}
+                      {isMicMuted ? "Muted" : "Active"}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Controls Under User Video */}
+                <div className="p-4 bg-gray-700 border-t border-gray-600">
+                  <div className="space-y-4">
+                    {/* Audio Level */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-300">Audio Level</span>
+                        <span className="text-gray-400">{Math.round(audioLevel)}%</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-lg font-semibold text-white">Current Question</h3>
-                          <Badge variant="outline" className="bg-gray-600 text-gray-200 border-gray-500">
-                            {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
-                          </Badge>
-                        </div>
-                        <p className="text-gray-200 text-lg leading-relaxed">{currentQuestion}</p>
-                        <div className="mt-3 flex items-center space-x-2 text-sm text-gray-400">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          <span>AI Interviewer is listening...</span>
-                        </div>
+                      <div className="w-full bg-gray-600 rounded-full h-2">
+                        <div 
+                          className="bg-green-500 h-2 rounded-full transition-all duration-100"
+                          style={{ width: `${audioLevel}%` }}
+                        />
                       </div>
+                    </div>
+
+                    {/* Control Buttons */}
+                    <div className="flex space-x-3">
+                      <Button 
+                        onClick={toggleMic} 
+                        variant={isMicMuted ? "destructive" : "default"}
+                        className="flex-1 h-10"
+                      >
+                        {isMicMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+                        {isMicMuted ? "Unmute" : "Mute"}
+                      </Button>
+                      
+                      <Button 
+                        variant="outline"
+                        className="flex-1 h-10 border-gray-600 text-gray-300 hover:bg-gray-600"
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Settings
+                      </Button>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Sidebar */}
-          <div className="w-80 bg-gray-800 border-l border-gray-700 p-6">
-            <div className="space-y-6">
-              {/* Controls */}
-              <div className="space-y-4">
-                <h3 className="text-white font-semibold">Controls</h3>
-                <div className="space-y-3">
-                  <Button 
-                    onClick={toggleMic} 
-                    variant={isMicMuted ? "destructive" : "default"}
-                    className="w-full h-12 text-lg"
-                  >
-                    {isMicMuted ? <MicOff className="w-5 h-5 mr-2" /> : <Mic className="w-5 h-5 mr-2" />}
-                    {isMicMuted ? "Unmute" : "Mute"}
-                  </Button>
-                  
-                  <Button 
-                    variant="outline"
-                    className="w-full h-12 text-lg border-gray-600 text-gray-300 hover:bg-gray-700"
-                  >
-                    <Settings className="w-5 h-5 mr-2" />
-                    Settings
-                  </Button>
-                </div>
-              </div>
-
-              {/* Audio Level */}
-              <div className="space-y-3">
-                <h3 className="text-white font-semibold">Audio Level</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-300">Input Level</span>
-                    <span className="text-gray-400">{Math.round(audioLevel)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-3">
-                    <div 
-                      className="bg-blue-500 h-3 rounded-full transition-all duration-100"
-                      style={{ width: `${audioLevel}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Session Info */}
-              <div className="space-y-3">
-                <h3 className="text-white font-semibold">Session Info</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
+            {/* Session Info Bar */}
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-2">
                     <span className="text-gray-400">Room:</span>
                     <span className="text-gray-200 font-mono">{roomData.roomName}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex items-center space-x-2">
                     <span className="text-gray-400">Status:</span>
                     <span className="text-green-400 font-mono">{room.connectionState}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex items-center space-x-2">
                     <span className="text-gray-400">Participants:</span>
                     <span className="text-gray-200 font-mono">{room.participants?.size || 0}</span>
                   </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-400">Session Time:</span>
+                  <span className="text-gray-200 font-mono">{formatTime(sessionTimer)}</span>
                 </div>
               </div>
             </div>
