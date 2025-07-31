@@ -355,19 +355,6 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                 {isMicMuted ? <MicOff className="w-3 h-3 mr-1" /> : <Mic className="w-3 h-3 mr-1" />}
                 {isMicMuted ? "Muted" : "Active"}
               </Badge>
-              <Button
-                onClick={() => {
-                  const sessionStats = getSessionStats();
-                  console.log('📊 Session Statistics:', sessionStats);
-                  endSession();
-                  onEnd();
-                }}
-                variant="destructive"
-                size="sm"
-              >
-                <PhoneOff className="w-4 h-4 mr-2" />
-                End Call
-              </Button>
             </div>
           </div>
         </div>
@@ -375,24 +362,26 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         {/* Main Content */}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="w-full max-w-6xl">
-            {/* Video Cards Container */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              {/* AI Interviewer Video Card */}
-              <div className="bg-gray-700 rounded-lg border border-gray-600 overflow-hidden">
-                {/* Question Heading */}
-                {currentQuestion && (
-                  <div className="bg-blue-600 px-4 py-3 border-b border-blue-500">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-white font-semibold text-lg">Current Question</h3>
-                      <Badge variant="outline" className="bg-blue-700 text-blue-100 border-blue-500">
-                        {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
-                      </Badge>
-                    </div>
-                    <p className="text-blue-100 text-sm mt-1">{currentQuestion}</p>
+            {/* Single Video Card with Side-by-Side Layout */}
+            <div className="bg-gray-700 rounded-lg border border-gray-600 overflow-hidden">
+              {/* AI Interviewer Section with Topic Header */}
+              <div className="bg-blue-600 px-4 py-3 border-b border-blue-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-white font-semibold text-lg">AI Interviewer</h3>
+                    {currentQuestion && (
+                      <p className="text-blue-100 text-sm mt-1">{currentQuestion}</p>
+                    )}
                   </div>
-                )}
-                
-                {/* AI Video Area */}
+                  <Badge variant="outline" className="bg-blue-700 text-blue-100 border-blue-500">
+                    {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
+                  </Badge>
+                </div>
+              </div>
+              
+              {/* Video Areas Side by Side */}
+              <div className="grid grid-cols-2">
+                {/* AI Interviewer Video Area */}
                 <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
                   <div className="text-center space-y-4">
                     <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
@@ -420,10 +409,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                     </Badge>
                   </div>
                 </div>
-              </div>
 
-              {/* User Video Card */}
-              <div className="bg-gray-700 rounded-lg border border-gray-600 overflow-hidden">
                 {/* User Video Area */}
                 <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
                   <div className="text-center space-y-4">
@@ -452,50 +438,64 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                     </Badge>
                   </div>
                 </div>
+              </div>
 
-                {/* Controls Under User Video */}
-                <div className="p-4 bg-gray-700 border-t border-gray-600">
-                  <div className="space-y-4">
-                    {/* Audio Level */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-300">Audio Level</span>
-                        <span className="text-gray-400">{Math.round(audioLevel)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-600 rounded-full h-2">
-                        <div 
-                          className="bg-green-500 h-2 rounded-full transition-all duration-100"
-                          style={{ width: `${audioLevel}%` }}
-                        />
-                      </div>
+              {/* Controls Under Video Areas */}
+              <div className="p-4 bg-gray-700 border-t border-gray-600">
+                <div className="space-y-4">
+                  {/* Audio Level */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300">Audio Level</span>
+                      <span className="text-gray-400">{Math.round(audioLevel)}%</span>
                     </div>
+                    <div className="w-full bg-gray-600 rounded-full h-2">
+                      <div 
+                        className="bg-green-500 h-2 rounded-full transition-all duration-100"
+                        style={{ width: `${audioLevel}%` }}
+                      />
+                    </div>
+                  </div>
 
-                    {/* Control Buttons */}
-                    <div className="flex space-x-3">
-                      <Button 
-                        onClick={toggleMic} 
-                        variant={isMicMuted ? "destructive" : "default"}
-                        className="flex-1 h-10"
-                      >
-                        {isMicMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
-                        {isMicMuted ? "Unmute" : "Mute"}
-                      </Button>
-                      
-                      <Button 
-                        variant="outline"
-                        className="flex-1 h-10 border-gray-600 text-gray-300 hover:bg-gray-600"
-                      >
-                        <Settings className="w-4 h-4 mr-2" />
-                        Settings
-                      </Button>
-                    </div>
+                  {/* Control Buttons */}
+                  <div className="flex space-x-3">
+                    <Button 
+                      onClick={toggleMic} 
+                      variant={isMicMuted ? "destructive" : "default"}
+                      className="flex-1 h-10"
+                    >
+                      {isMicMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+                      {isMicMuted ? "Unmute" : "Mute"}
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      className="flex-1 h-10 border-gray-600 text-gray-300 hover:bg-gray-600"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        const sessionStats = getSessionStats();
+                        console.log('📊 Session Statistics:', sessionStats);
+                        endSession();
+                        onEnd();
+                      }}
+                      variant="destructive"
+                      className="flex-1 h-10"
+                    >
+                      <PhoneOff className="w-4 h-4 mr-2" />
+                      End Call
+                    </Button>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Session Info Bar */}
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mt-6">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center space-x-6">
                   <div className="flex items-center space-x-2">
