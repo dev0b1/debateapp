@@ -93,7 +93,7 @@ app.use((req, res, next) => {
     port,
     host: "localhost",
   }, () => {
-    log(`🚀 Confidence Compass server running on port ${port}`);
+    log(`🚀 AI Debate Arena server running on port ${port}`);
     log(`📱 Open http://localhost:${port} in your browser`);
     log(`🌍 Environment: ${process.env.NODE_ENV}`);
     

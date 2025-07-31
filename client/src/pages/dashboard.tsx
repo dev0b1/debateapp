@@ -47,21 +47,21 @@ export default function Dashboard() {
       return [
         {
           id: "1",
-          title: "Behavioral Interview Practice",
+          title: "Debate with Socrates - AI Ethics",
           createdAt: new Date().toISOString(),
           overallScore: 85,
           duration: 1800
         },
         {
           id: "2", 
-          title: "Technical Interview Practice",
+          title: "Debate with Einstein - Climate Action",
           createdAt: new Date(Date.now() - 86400000).toISOString(),
           overallScore: 72,
           duration: 2400
         },
         {
           id: "3",
-          title: "General Interview Practice", 
+          title: "Debate with Elon Musk - Universal Basic Income", 
           createdAt: new Date(Date.now() - 172800000).toISOString(),
           overallScore: 78,
           duration: 1500
@@ -92,15 +92,15 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-          <p className="text-gray-600 mt-1">Track your communication confidence progress</p>
+          <h2 className="text-2xl font-bold text-gray-900">Debate Arena Dashboard</h2>
+          <p className="text-gray-600 mt-1">Track your debate performance and improvement</p>
         </div>
         <Button 
-          onClick={() => setLocation("/ai-conversation")}
-          className="bg-blue-600 hover:bg-blue-700"
+          onClick={() => setLocation("/ai-debate")}
+          className="bg-purple-600 hover:bg-purple-700"
         >
           <Play className="mr-2 h-4 w-4" />
-          Start Practice
+          Start Debate
         </Button>
       </div>
 
