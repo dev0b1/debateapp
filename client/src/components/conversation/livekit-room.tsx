@@ -362,26 +362,11 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         {/* Main Content */}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="w-full max-w-6xl">
-            {/* Single Video Card with Side-by-Side Layout */}
+            {/* Single Video Card with AI Avatar and User Camera */}
             <div className="bg-gray-700 rounded-lg border border-gray-600 overflow-hidden">
-              {/* AI Interviewer Section with Topic Header */}
-              <div className="bg-blue-600 px-4 py-3 border-b border-blue-500">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-white font-semibold text-lg">AI Interviewer</h3>
-                    {currentQuestion && (
-                      <p className="text-blue-100 text-sm mt-1">{currentQuestion}</p>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="bg-blue-700 text-blue-100 border-blue-500">
-                    {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
-                  </Badge>
-                </div>
-              </div>
-              
               {/* Video Areas Side by Side */}
               <div className="grid grid-cols-2">
-                {/* AI Interviewer Video Area */}
+                {/* AI Interviewer Avatar */}
                 <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
                   <div className="text-center space-y-4">
                     <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
@@ -410,23 +395,17 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                   </div>
                 </div>
 
-                {/* User Video Area */}
+                {/* User Camera */}
                 <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
-                  <div className="text-center space-y-4">
-                    <div className="w-32 h-32 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
-                      <Mic className="w-16 h-16 text-white" />
-                    </div>
-                    <div className="space-y-2">
-                      <h2 className="text-xl font-bold text-white">You</h2>
-                      <p className="text-gray-300 text-sm">Speaking to AI interviewer</p>
-                    </div>
-                    {/* Audio Level Indicator */}
-                    <div className="flex justify-center space-x-1">
-                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" />
-                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }} />
-                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
-                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
-                      <div className="w-2 h-8 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                  <div className="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center">
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto">
+                        <Mic className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <div className="space-y-2">
+                        <h2 className="text-lg font-semibold text-white">Your Camera</h2>
+                        <p className="text-gray-400 text-sm">Video feed will appear here</p>
+                      </div>
                     </div>
                   </div>
                   
@@ -439,6 +418,21 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Current Question Section */}
+              {currentQuestion && (
+                <div className="bg-blue-600 px-4 py-3 border-t border-blue-500">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-white font-semibold text-lg mb-1">Current Question</h3>
+                      <p className="text-blue-100 text-sm leading-relaxed">{currentQuestion}</p>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-700 text-blue-100 border-blue-500 ml-4">
+                      {Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}
+                    </Badge>
+                  </div>
+                </div>
+              )}
 
               {/* Controls Under Video Areas */}
               <div className="p-4 bg-gray-700 border-t border-gray-600">
