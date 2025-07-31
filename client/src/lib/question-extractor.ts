@@ -124,7 +124,7 @@ export function extractMainQuestion(aiResponse: string): ExtractedQuestion {
 
   // Last resort: return a generic question
   return {
-    question: "Please respond to the interviewer's question.",
+    question: "Please respond to the debate opponent's question.",
     category: 'General',
     suggestedDuration: 120000,
     confidence: 0.2

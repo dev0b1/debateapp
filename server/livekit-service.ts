@@ -153,7 +153,7 @@ export class LiveKitService extends EventEmitter {
         difficulty: options.difficulty,
         prompt: options.prompt,
         context: options.context,
-        interviewerRole: options.interviewerRole,
+        debaterRole: options.famousDebater,
         timestamp: Date.now()
       });
 

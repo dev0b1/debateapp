@@ -1,48 +1,67 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "./components/ui/toaster";
-import { TooltipProvider } from "./components/ui/tooltip";
-import { Sidebar } from "./components/layout/sidebar";
-import Dashboard from "./pages/dashboard";
-import AIDebate from "./pages/ai-debate";
-import SessionHistory from "./pages/session-history";
-import Settings from "./pages/settings";
-
-function Router() {
-  return (
-    <div className="flex flex-col md:flex-row h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        <Switch>
-          <Route path="/" component={Dashboard} />
-
-          <Route path="/ai-debate" component={AIDebate} />
-          <Route path="/history" component={SessionHistory} />
-          <Route path="/settings" component={Settings} />
-          <Route>
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">Page Not Found</h1>
-                <p className="text-gray-600">The requested page could not be found.</p>
-              </div>
-            </div>
-          </Route>
-        </Switch>
-      </main>
-    </div>
-  );
-}
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from './hooks/use-auth'
+import { AuthForm } from './components/auth/auth-form'
+import AIDebate from './pages/ai-debate'
+import Dashboard from './pages/dashboard'
+import SessionHistory from './pages/session-history'
+import Settings from './pages/settings'
+import NotFound from './pages/not-found'
+import { Toaster } from './components/ui/toaster'
 
 function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+    <Router>
+      <div className="App">
+        <Routes>
+          {/* Public routes */}
+          <Route 
+            path="/auth" 
+            element={user ? <Navigate to="/dashboard" replace /> : <AuthForm />} 
+          />
+          
+          {/* Protected routes */}
+          <Route 
+            path="/dashboard" 
+            element={user ? <Dashboard /> : <Navigate to="/auth" replace />} 
+          />
+          <Route 
+            path="/debate" 
+            element={user ? <AIDebate /> : <Navigate to="/auth" replace />} 
+          />
+          <Route 
+            path="/history" 
+            element={user ? <SessionHistory /> : <Navigate to="/auth" replace />} 
+          />
+          <Route 
+            path="/settings" 
+            element={user ? <Settings /> : <Navigate to="/auth" replace />} 
+          />
+          
+          {/* Default redirects */}
+          <Route 
+            path="/" 
+            element={<Navigate to={user ? "/dashboard" : "/auth"} replace />} 
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        
         <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
+      </div>
+    </Router>
+  )
 }
 
-export default App;
+export default App

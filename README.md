@@ -88,9 +88,9 @@ cp server/env.example server/.env
 ```
 
 3. **Start the app**
-```bash
-npm run dev
-```
+   ```bash
+   npm run dev
+   ```
 
 4. **Open your browser**
 Navigate to `http://localhost:5000`

@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { useToast } from "../../hooks/use-toast";
-import { Square, Mic, MicOff, MessageCircle, Phone, PhoneOff, Settings, Users, Clock } from "lucide-react";
+import { Square, Mic, MicOff, MessageCircle, Phone, PhoneOff, Settings, Users, Clock, Brain } from "lucide-react";
 import { VideoRecording } from "./video-recording";
 import { QuestionTimer } from "./question-timer";
 import { useQuestionSession } from "../../hooks/use-question-session";
@@ -180,21 +180,22 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         switch (state) {
           case ConnectionState.Connected:
             toast({
-              title: "Connected!",
-              description: "You're now connected to the AI interviewer.",
+              title: "AI Debate Opponent Joined",
+              description: "Your AI debate opponent is now in the room.",
+              duration: 3000,
             });
             break;
           case ConnectionState.Disconnected:
             toast({
               title: "Disconnected",
-              description: "Connection to the AI interviewer was lost.",
+              description: "Connection to the AI debate opponent was lost.",
               variant: "destructive",
             });
             break;
           case ConnectionState.Connecting:
             toast({
               title: "Connecting...",
-              description: "Establishing connection to AI interviewer.",
+              description: "Establishing connection to AI debate opponent.",
             });
             break;
         }
@@ -205,8 +206,9 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
         
         if (track.kind === Track.Kind.Audio) {
           toast({
-            title: "AI Interviewer Joined",
-            description: "Your AI interviewer is now in the room.",
+            title: "AI Debate Opponent Joined",
+            description: "Your AI debate opponent is now in the room.",
+            duration: 3000,
           });
         }
       });
@@ -249,7 +251,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
       
               toast({
         title: "Connection Failed",
-        description: "Failed to connect to the AI interviewer. Please try again.",
+        description: "Failed to connect to the AI debate opponent. Please try again.",
         variant: "destructive",
       });
     }
@@ -321,7 +323,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
                 <Phone className="w-8 h-8 text-blue-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Connecting...</h3>
-              <p className="text-gray-600 text-sm">Establishing connection to AI interviewer</p>
+              <p className="text-gray-600 text-sm">Establishing connection to AI debate opponent</p>
               <div className="flex justify-center space-x-1">
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -343,7 +345,7 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-white font-medium">AI Interview Session</span>
+                <span className="text-white font-medium">AI Debate Session</span>
               </div>
               <Badge variant="outline" className="bg-gray-700 text-gray-200 border-gray-600">
                 <Clock className="w-3 h-3 mr-1" />
@@ -366,32 +368,14 @@ export function LiveKitRoom({ roomData, onEnd }: LiveKitRoomProps) {
             <div className="bg-gray-700 rounded-lg border border-gray-600 overflow-hidden">
               {/* Video Areas Side by Side */}
               <div className="grid grid-cols-2">
-                {/* AI Interviewer Avatar */}
-                <div className="aspect-video bg-gray-800 flex items-center justify-center relative">
-                  <div className="text-center space-y-4">
-                    <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-2xl">
-                      <Users className="w-16 h-16 text-white" />
-                    </div>
-                    <div className="space-y-2">
-                      <h2 className="text-xl font-bold text-white">AI Interviewer</h2>
-                      <p className="text-gray-300 text-sm">Listening and responding</p>
-                    </div>
-                    {/* Audio Level Indicator */}
-                    <div className="flex justify-center space-x-1">
-                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" />
-                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }} />
-                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
-                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
-                      <div className="w-2 h-8 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
-                    </div>
+                {/* AI Debate Opponent Avatar */}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                    <Brain className="w-5 h-5 text-white" />
                   </div>
-                  
-                  {/* Connection Status */}
-                  <div className="absolute top-4 left-4">
-                    <Badge className="bg-green-600">
-                      <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
-                      Live
-                    </Badge>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">AI Debate Opponent</h2>
+                    <p className="text-gray-300 text-sm">Listening and responding</p>
                   </div>
                 </div>
 

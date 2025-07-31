@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Real-time analysis system for interview practice
-Monitors user responses and provides interruptions when needed
+Real-time analysis system for debate practice
 """
 
 import asyncio
@@ -22,11 +21,11 @@ class AnalysisResult:
     current_topic: str = ""
 
 class RealtimeAnalyzer:
-    def __init__(self, interviewer_role: Dict):
-        self.interviewer_role = interviewer_role
-        self.role_id = interviewer_role.get('id', 'standard')
-        self.interruption_threshold = interviewer_role.get('interruptionThreshold', 120)
-        self.filler_word_tolerance = interviewer_role.get('fillerWordTolerance', 0.7)
+    def __init__(self, debater_role: Dict):
+        self.debater_role = debater_role
+        self.role_id = debater_role.get('id', 'standard')
+        self.interruption_threshold = debater_role.get('interruptionThreshold', 120)
+        self.filler_word_tolerance = debater_role.get('fillerWordTolerance', 0.7)
         
         # Filler words to detect
         self.filler_words = [
@@ -74,7 +73,7 @@ class RealtimeAnalyzer:
         interruption_reason = ""
         
         if self.role_id == 'tough':
-            # Tough interviewer is more strict
+            # Tough debater is more strict
             if is_rambling:
                 should_interrupt = True
                 interruption_reason = "Response too long"
@@ -85,7 +84,7 @@ class RealtimeAnalyzer:
                 should_interrupt = True
                 interruption_reason = "Going off-topic"
         elif self.role_id == 'friendly':
-            # Friendly interviewer is more tolerant
+            # Friendly debater is more tolerant
             if is_rambling and duration > self.interruption_threshold * 1.5:
                 should_interrupt = True
                 interruption_reason = "Response getting long"
@@ -93,7 +92,7 @@ class RealtimeAnalyzer:
                 should_interrupt = True
                 interruption_reason = "Many filler words"
         else:
-            # Standard interviewer
+            # Standard debater
             if is_rambling:
                 should_interrupt = True
                 interruption_reason = "Response too long"
@@ -111,29 +110,31 @@ class RealtimeAnalyzer:
     def get_interruption_message(self, reason: str) -> str:
         """Get appropriate interruption message based on role and reason"""
         if self.role_id == 'tough':
-            if 'long' in reason.lower():
-                return "That's enough. Let's move on to the next question."
-            elif 'filler' in reason.lower():
-                return "Stop using so many filler words. Be more direct."
-            elif 'off-topic' in reason.lower():
-                return "You're not answering the question directly. Focus on the question."
+            if reason == "Response too long":
+                return "I need to interrupt. Your response is getting too long. Please be more concise."
+            elif reason == "Too many filler words":
+                return "I'm interrupting because you're using too many filler words. Speak more directly."
+            elif reason == "Going off-topic":
+                return "You're going off-topic. Let's stay focused on the debate question."
             else:
-                return "Let's move on."
+                return "I need to interrupt. Please be more concise."
         elif self.role_id == 'friendly':
-            if 'long' in reason.lower():
-                return "Thank you for that detailed response. Let's move to the next question."
-            elif 'filler' in reason.lower():
-                return "Try to be a bit more direct in your answers."
+            if reason == "Response getting long":
+                return "I'd like to interject here. Your response is getting quite long."
+            elif reason == "Many filler words":
+                return "I notice you're using many filler words. Try to speak more directly."
             else:
-                return "Let's continue with the next question."
+                return "I'd like to interject here."
         else:
-            # Standard interviewer
-            if 'long' in reason.lower():
-                return "Thank you. Let's move on to the next question."
-            elif 'filler' in reason.lower():
-                return "Try to be more concise in your answers."
+            # Standard debater
+            if reason == "Response too long":
+                return "I need to interrupt. Your response is getting too long."
+            elif reason == "Too many filler words":
+                return "I'm interrupting because you're using too many filler words."
+            elif reason == "Going off-topic":
+                return "You're going off-topic. Let's stay focused."
             else:
-                return "Let's continue."
+                return "I need to interrupt. Please be more concise."
     
     def update_response_tracking(self, transcript: str, is_speaking: bool):
         """Track ongoing response for real-time analysis"""
@@ -169,11 +170,11 @@ class RealtimeAnalyzer:
 async def test_analyzer():
     """Test the real-time analyzer"""
     
-    # Test with different interviewer roles
+    # Test with different debater roles
     roles = [
         {'id': 'tough', 'interruptionThreshold': 60, 'fillerWordTolerance': 0.3},
-        {'id': 'friendly', 'interruptionThreshold': 180, 'fillerWordTolerance': 0.9},
-        {'id': 'standard', 'interruptionThreshold': 120, 'fillerWordTolerance': 0.7}
+        {'id': 'friendly', 'interruptionThreshold': 180, 'fillerWordTolerance': 0.7},
+        {'id': 'standard', 'interruptionThreshold': 120, 'fillerWordTolerance': 0.5}
     ]
     
     test_responses = [
@@ -183,7 +184,7 @@ async def test_analyzer():
     ]
     
     for role in roles:
-        print(f"\n=== Testing {role['id']} interviewer ===")
+        print(f"\n=== Testing {role['id']} debater ===")
         analyzer = RealtimeAnalyzer(role)
         
         for i, response in enumerate(test_responses):

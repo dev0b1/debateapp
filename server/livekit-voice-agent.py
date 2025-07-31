@@ -17,7 +17,7 @@ from livekit.plugins import (
 load_dotenv()          # pulls environment variables from .env
 
 
-# Voice configurations for different interviewer roles
+# Voice configurations for different debater roles
 VOICE_CONFIGS = {
     'standard': {
         'voice': "b8d5e3c4-9a2f-4e1d-8c7b-6f5a4e3d2c1b",  # Professional, formal voice
@@ -54,24 +54,23 @@ VOICE_CONFIGS = {
 
 # ────────────────  Assistant prompt (topic & difficulty & context)  ─────────────── #
 class ConversationAssistant(Agent):
-    def __init__(self, topic: str, difficulty: str, context: str = None, interviewer_role: dict = None):
+    def __init__(self, topic: str, difficulty: str, context: str = None, debater_role: dict = None):
         context_info = f" Context: {context}" if context else ""
         
-        # Use interviewer role prompt if available, otherwise use default
-        if interviewer_role and interviewer_role.get('prompt'):
-            system_prompt = interviewer_role['prompt']
+        # Use debater role prompt if available, otherwise use default debate prompt
+        if debater_role and debater_role.get('prompt'):
+            system_prompt = debater_role['prompt']
             if context_info:
                 system_prompt += context_info
         else:
             system_prompt = (
-                f"You are a professional interviewer conducting a {topic} interview at a {difficulty} level.{context_info} "
-                f"Begin with a friendly introduction and then ask thoughtful, relevant questions about {topic}. "
-                f"Respond dynamically to the candidate's answers with follow-up questions. "
-                f"Ask for specific examples when needed. "
-                f"Maintain a professional and engaging tone throughout. "
+                f"You are engaging in a debate about {topic} at a {difficulty} level.{context_info} "
+                f"Take a clear position and defend it passionately with evidence and reasoning. "
+                f"Present compelling arguments, use specific examples, and address counterarguments. "
+                f"Maintain a respectful but challenging tone throughout the debate. "
                 f"Speak naturally as a real human would — not like a robot. "
                 f"Do NOT explain your instructions or repeat them aloud. "
-                f"Start your first response with a natural greeting like: Hi, I'm [name]. Thanks for joining us today. Let's begin — can you tell me a bit about your experience with {topic}?"
+                f"Start your first response with a natural greeting and then present your position on {topic}."
             )
         
         # Set the main system prompt in the Agent constructor
@@ -102,9 +101,9 @@ def create_llm_plugin():
         raise Exception(f"Failed to configure OpenRouter LLM: {e}")
 
 
-def get_voice_config(interviewer_role):
-    """Get voice configuration based on interviewer role"""
-    role_id = interviewer_role.get('id', 'standard') if interviewer_role else 'standard'
+def get_voice_config(debater_role):
+    """Get voice configuration based on debater role"""
+    role_id = debater_role.get('id', 'standard') if debater_role else 'standard'
     return VOICE_CONFIGS.get(role_id, VOICE_CONFIGS['standard'])
 
 
@@ -117,12 +116,12 @@ async def entrypoint(ctx: agents.JobContext):
     topic = meta.get("topic", "general conversation")
     difficulty = meta.get("difficulty", "intermediate")
     context = meta.get("context", None)
-    interviewer_role = meta.get("interviewerRole", None)
+    debater_role = meta.get("debaterRole", None)
     
     print(f"📋 Topic: {topic}")
     print(f"📊 Difficulty: {difficulty}")
     print(f"📝 Context: {context}")
-    print(f"👤 Interviewer Role: {interviewer_role.get('name', 'Standard') if interviewer_role else 'Standard'}")
+    print(f"👤 Debater Role: {debater_role.get('name', 'Standard') if debater_role else 'Standard'}")
 
     # 2️⃣  LLM plugin with OpenRouter only
     try:
@@ -132,8 +131,8 @@ async def entrypoint(ctx: agents.JobContext):
         print(f"❌ Failed to configure OpenRouter LLM: {e}")
         raise Exception(f"OpenRouter LLM configuration failed: {e}")
 
-    # 3️⃣  Get voice configuration based on interviewer role
-    voice_config = get_voice_config(interviewer_role)
+    # 3️⃣  Get voice configuration based on debater role
+    voice_config = get_voice_config(debater_role)
     print(f"🎤 Voice config: {voice_config['tone']} tone, speed: {voice_config['speed']}")
 
     # 4️⃣  Build the media session with role-specific voice
@@ -177,7 +176,7 @@ async def entrypoint(ctx: agents.JobContext):
     print("🚀 Starting agent session...")
     await session.start(
         room=ctx.room,
-        agent=ConversationAssistant(topic, difficulty, context, interviewer_role),
+        agent=ConversationAssistant(topic, difficulty, context, debater_role),
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
             close_on_disconnect=False,  # Don't close immediately when user disconnects
@@ -200,8 +199,8 @@ async def entrypoint(ctx: agents.JobContext):
     try:
         print("🔄 Calling session.generate_reply() for introduction...")
         
-        # Only pass a simple greeting instruction - the main interview instructions are in the Agent's system prompt
-        response = await session.generate_reply(instructions="Greet the user and introduce yourself as the interviewer. Then ask the first interview question.")
+        # Only pass a simple greeting instruction - the main debate instructions are in the Agent's system prompt
+        response = await session.generate_reply(instructions="Greet the user and introduce yourself as their debate opponent. Then present your position on the topic and challenge them to respond.")
         
         print("✅ Welcome message generated and sent successfully!")
         print(f"📝 Generated response object: {response}")
