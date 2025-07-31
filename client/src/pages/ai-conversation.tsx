@@ -22,9 +22,9 @@ import { useToast } from "@/hooks/use-toast";
 import { SessionFeedback } from "@/components/conversation/session-feedback";
 import { LiveKitRoom } from "@/components/conversation/livekit-room";
 import { SessionAnalytics } from "@/components/conversation/session-analytics";
-import { INTERVIEWER_ROLES, InterviewerRole } from "@/lib/interviewer-roles";
+import { DEBATE_PERSONALITIES, DebatePersonality } from "@/lib/debate-personalities";
 
-interface InterviewSession {
+interface DebateSession {
   id: string;
   type: string;
   context?: string;
@@ -44,9 +44,9 @@ const interviewTypes = [
 ];
 
 export default function AIConversation() {
-  const [selectedInterviewType, setSelectedInterviewType] = useState('');
-  const [selectedInterviewerRole, setSelectedInterviewerRole] = useState<InterviewerRole>(INTERVIEWER_ROLES[0]);
-  const [interviewContext, setInterviewContext] = useState('');
+  const [selectedDebateTopic, setSelectedDebateTopic] = useState('');
+  const [selectedDebatePersonality, setSelectedDebatePersonality] = useState<DebatePersonality>(DEBATE_PERSONALITIES[0]);
+  const [debateContext, setDebateContext] = useState('');
   const [isInConversation, setIsInConversation] = useState(false);
   const [roomData, setRoomData] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
@@ -60,7 +60,7 @@ export default function AIConversation() {
   const { toast } = useToast();
 
   const createRoomMutation = useMutation({
-    mutationFn: async (sessionData: InterviewSession) => {
+    mutationFn: async (sessionData: DebateSession) => {
       // Call the actual API to create a LiveKit room
       const response = await fetch('/api/conversation/create-room', {
         method: 'POST',
@@ -107,45 +107,45 @@ export default function AIConversation() {
     }
   });
 
-  const startInterview = () => {
-    if (!selectedInterviewType) {
+  const startDebate = () => {
+    if (!selectedDebateTopic) {
       toast({
-        title: "Select Interview Type",
-        description: "Please choose an interview type to continue.",
+        title: "Select Debate Topic",
+        description: "Please choose a debate topic to continue.",
         variant: "destructive",
       });
       return;
     }
 
-    const sessionData: InterviewSession = {
-      id: `interview-${Date.now()}`,
-      type: selectedInterviewType,
-      context: interviewContext || undefined
+    const sessionData: DebateSession = {
+      id: `debate-${Date.now()}`,
+      type: selectedDebateTopic,
+      context: debateContext || undefined
     };
 
-    // Add interviewer role to the session data
-    const sessionWithRole = {
+    // Add debate personality to the session data
+    const sessionWithPersonality = {
       ...sessionData,
-      interviewerRole: selectedInterviewerRole
+      debatePersonality: selectedDebatePersonality
     };
 
     setProcessing(true);
     processingRef.current = sessionData.id;
-    createRoomMutation.mutate(sessionWithRole);
+    createRoomMutation.mutate(sessionWithPersonality);
   };
 
   const endConversation = () => {
     setIsInConversation(false);
     setRoomData(null);
-    setSelectedInterviewType('');
-    setInterviewContext('');
+    setSelectedDebateTopic('');
+    setDebateContext('');
     setCurrentQuestion('');
     setProcessing(false);
     processingRef.current = null;
   };
 
-  const getInterviewTypeInfo = (type: string) => {
-    return interviewTypes.find(t => t.value === type);
+  const getDebateTopicInfo = (type: string) => {
+    return debateTopics.find(t => t.value === type);
   };
 
 

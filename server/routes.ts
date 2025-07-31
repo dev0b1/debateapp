@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { conversationTopics, getTopicById } from "./conversation-topics";
+import { debateTopics, getTopicById } from "./debate-topics";
 import { liveKitService } from "./livekit-service";
 import testRouter from "./test-routes";
 
@@ -51,19 +51,19 @@ router.get("/api/user/current", (req, res) => {
 
 
 
-// Get conversation topics
+// Get debate topics
 router.get("/api/conversation/topics", (req, res) => {
-  console.log("Fetching conversation topics:", conversationTopics.length, "topics available");
-  res.json(conversationTopics);
+  console.log("Fetching debate topics:", debateTopics.length, "topics available");
+  res.json(debateTopics);
 });
 
 // Create a LiveKit conversation room with AI voice agent
 router.post("/api/conversation/create-room", async (req, res) => {
   try {
-    const { topicId, context, interviewerRole } = req.body;
-    console.log("Creating conversation room for topic ID:", topicId);
+    const { topicId, context, famousDebater } = req.body;
+    console.log("Creating debate room for topic ID:", topicId);
     console.log("Context provided:", context || "None");
-    console.log("Interviewer role:", interviewerRole?.name || "Standard");
+    console.log("Famous debater:", famousDebater?.name || "Standard");
     
     if (!topicId) {
       console.log("Missing topicId in request body");
@@ -92,7 +92,7 @@ router.post("/api/conversation/create-room", async (req, res) => {
 
     // Create room and get token
     console.log("Creating LiveKit room for topic:", topic.title);
-    const { roomName, token } = await liveKitService.createConversationRoom(topicId, context, interviewerRole);
+    const { roomName, token } = await liveKitService.createConversationRoom(topicId, context, famousDebater);
     console.log("Room created:", roomName);
 
     // Wait for agent to connect (with timeout)

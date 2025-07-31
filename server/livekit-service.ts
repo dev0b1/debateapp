@@ -1,6 +1,6 @@
 import { AccessToken } from "livekit-server-sdk";
 import { ConversationTopic, LiveKitSession } from "@shared/schema";
-import { getTopicById } from "./conversation-topics";
+import { getTopicById } from "./debate-topics";
 import { spawn, execSync } from "child_process";
 import { EventEmitter } from "events";
 
@@ -44,7 +44,7 @@ export class LiveKitService extends EventEmitter {
     return this.isConfigured;
   }
 
-  async createConversationRoom(topicId: string, context?: string, interviewerRole?: any): Promise<{ roomName: string; token: string; serverUrl: string; topic: ConversationTopic }> {
+  async createConversationRoom(topicId: string, context?: string, famousDebater?: any): Promise<{ roomName: string; token: string; serverUrl: string; topic: ConversationTopic }> {
     if (!this.isConfigured) {
       throw new Error("LiveKit is not configured. Please set up your LiveKit credentials in the .env file.");
     }
@@ -89,13 +89,13 @@ export class LiveKitService extends EventEmitter {
         canUpdateOwnMetadata: true
       });
 
-      // Start the voice agent with topic information, context, and interviewer role
+      // Start the voice agent with topic information, context, and famous debater
       await this.startVoiceAgent(roomName, {
         topic: topic.title,
         difficulty: topic.difficulty,
         prompt: topic.prompt,
         context: context,
-        interviewerRole: interviewerRole,
+        famousDebater: famousDebater,
         token: await agentToken.toJwt()
       });
 
@@ -143,7 +143,7 @@ export class LiveKitService extends EventEmitter {
     difficulty: string; 
     prompt: string;
     context?: string;
-    interviewerRole?: any;
+    famousDebater?: any;
     token: string;
   }): Promise<void> {
     try {
