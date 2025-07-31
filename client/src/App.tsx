@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuth } from './hooks/use-auth'
 import { AuthForm } from './components/auth/auth-form'
 import AIDebate from './pages/ai-debate'
@@ -8,7 +9,10 @@ import Settings from './pages/settings'
 import NotFound from './pages/not-found'
 import { Toaster } from './components/ui/toaster'
 
-function App() {
+// Create a client
+const queryClient = new QueryClient()
+
+function AppContent() {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -61,6 +65,14 @@ function App() {
         <Toaster />
       </div>
     </Router>
+  )
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
   )
 }
 
