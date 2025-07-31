@@ -1,14 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Eye, BarChart3, Video, History, Settings, User, MessageCircle, Menu, X, Zap } from "lucide-react";
+import { BarChart3, History, Settings, User, Menu, X, Zap } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
   { name: "AI Debate", href: "/ai-debate", icon: Zap },
-  { name: "AI Conversation", href: "/ai-conversation", icon: MessageCircle },
-  { name: "Session History", href: "/history", icon: History },
+  { name: "Debate History", href: "/history", icon: History },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -52,9 +51,9 @@ export function Sidebar() {
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <Eye className="h-6 w-6 text-white" />
-            </div>
+                         <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center">
+               <Zap className="h-6 w-6 text-white" />
+             </div>
             <div>
               <h1 className="font-bold text-lg text-gray-900">AI Debate Arena</h1>
               <p className="text-sm text-gray-500">Debate with Famous Personalities</p>
